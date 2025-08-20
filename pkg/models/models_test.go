@@ -8,7 +8,7 @@ import (
 
 func TestAttackAttempt(t *testing.T) {
 	now := time.Now()
-	
+
 	tests := []struct {
 		name    string
 		attempt AttackAttempt
@@ -64,7 +64,7 @@ func TestAttackAttempt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.attempt.IsValidIP() != tt.isValid {
-				t.Errorf("IsValidIP() = %v, want %v for IP %s", 
+				t.Errorf("IsValidIP() = %v, want %v for IP %s",
 					tt.attempt.IsValidIP(), tt.isValid, tt.attempt.IP)
 			}
 		})
@@ -77,10 +77,10 @@ func TestBlockRecord(t *testing.T) {
 	past := now.Add(-time.Hour)
 
 	tests := []struct {
-		name       string
-		record     BlockRecord
-		isExpired  bool
-		hasExpiry  bool
+		name      string
+		record    BlockRecord
+		isExpired bool
+		hasExpiry bool
 	}{
 		{
 			name: "active block with future expiry",

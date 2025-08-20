@@ -19,9 +19,9 @@ type MemoryStorage struct {
 	nextBlockID  int64
 
 	// Data storage
-	attacks      map[int64]*models.AttackAttempt
-	blocks       map[string]*models.BlockRecord // keyed by IP
-	attacksByIP  map[string][]*models.AttackAttempt
+	attacks     map[int64]*models.AttackAttempt
+	blocks      map[string]*models.BlockRecord // keyed by IP
+	attacksByIP map[string][]*models.AttackAttempt
 }
 
 // NewMemoryStorage creates a new in-memory storage instance
@@ -42,7 +42,7 @@ func (m *MemoryStorage) SaveAttack(attempt *models.AttackAttempt) error {
 	}
 
 	if !attempt.IsValidIP() {
-		return core.NewError(core.ErrInvalidIP, 
+		return core.NewError(core.ErrInvalidIP,
 			fmt.Sprintf("invalid IP address: %s", attempt.IP), nil)
 	}
 
@@ -186,7 +186,7 @@ func (m *MemoryStorage) GetBlock(ip string) (*models.BlockRecord, error) {
 
 	block, exists := m.blocks[ip]
 	if !exists {
-		return nil, core.NewError(core.ErrRecordNotFound, 
+		return nil, core.NewError(core.ErrRecordNotFound,
 			fmt.Sprintf("no block record found for IP %s", ip), nil)
 	}
 
@@ -238,7 +238,7 @@ func (m *MemoryStorage) UpdateBlock(block *models.BlockRecord) error {
 
 	_, exists := m.blocks[block.IP]
 	if !exists {
-		return core.NewError(core.ErrRecordNotFound, 
+		return core.NewError(core.ErrRecordNotFound,
 			fmt.Sprintf("no block record found for IP %s", block.IP), nil)
 	}
 

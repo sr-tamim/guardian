@@ -12,13 +12,13 @@ func TestSSHParser_ParseLine(t *testing.T) {
 	parser := NewSSHParser()
 
 	tests := []struct {
-		name           string
-		logLine        string
-		expectAttack   bool
-		expectedIP     string
-		expectedUser   string
-		expectedSev    models.Severity
-		expectError    bool
+		name         string
+		logLine      string
+		expectAttack bool
+		expectedIP   string
+		expectedUser string
+		expectedSev  models.Severity
+		expectError  bool
 	}{
 		{
 			name:         "failed password valid user",
@@ -100,10 +100,10 @@ func TestSSHParser_ParseLine(t *testing.T) {
 			expectAttack: false,
 		},
 		{
-			name:        "invalid IP in log - should return nil",
-			logLine:     "Jan 15 14:20:33 server sshd[12345]: Failed password for admin from invalid-ip port 22",
+			name:         "invalid IP in log - should return nil",
+			logLine:      "Jan 15 14:20:33 server sshd[12345]: Failed password for admin from invalid-ip port 22",
 			expectAttack: false,
-			expectError: false,
+			expectError:  false,
 		},
 	}
 
@@ -194,7 +194,7 @@ func TestSSHParser_GetSeverityForPattern(t *testing.T) {
 	parser := NewSSHParser()
 
 	tests := []struct {
-		patternIndex    int
+		patternIndex     int
 		expectedSeverity models.Severity
 	}{
 		{0, models.SeverityMedium}, // Failed password
@@ -221,9 +221,9 @@ func TestSSHParser_IsValidLogFormat(t *testing.T) {
 	parser := NewSSHParser()
 
 	tests := []struct {
-		name     string
-		logLine  string
-		isValid  bool
+		name    string
+		logLine string
+		isValid bool
 	}{
 		{
 			name:    "valid syslog format",

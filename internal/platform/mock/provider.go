@@ -11,13 +11,13 @@ import (
 
 // Provider implements a mock platform provider for testing
 type Provider struct {
-	mu          sync.RWMutex
-	name        string
-	supported   bool
-	blockedIPs  map[string]blockInfo
-	logPaths    map[string][]string
-	serviceErr  error
-	monitoring  map[string]bool // logPath -> monitoring status
+	mu         sync.RWMutex
+	name       string
+	supported  bool
+	blockedIPs map[string]blockInfo
+	logPaths   map[string][]string
+	serviceErr error
+	monitoring map[string]bool // logPath -> monitoring status
 }
 
 type blockInfo struct {
@@ -77,7 +77,7 @@ func (p *Provider) BlockIP(ip string, duration time.Duration, reason string) err
 
 	// Check if already blocked
 	if _, exists := p.blockedIPs[ip]; exists {
-		return core.NewError(core.ErrIPAlreadyBlocked, 
+		return core.NewError(core.ErrIPAlreadyBlocked,
 			fmt.Sprintf("IP %s is already blocked", ip), nil)
 	}
 
@@ -100,7 +100,7 @@ func (p *Provider) UnblockIP(ip string) error {
 	defer p.mu.Unlock()
 
 	if _, exists := p.blockedIPs[ip]; !exists {
-		return core.NewError(core.ErrIPNotBlocked, 
+		return core.NewError(core.ErrIPNotBlocked,
 			fmt.Sprintf("IP %s is not blocked", ip), nil)
 	}
 

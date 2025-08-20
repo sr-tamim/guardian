@@ -66,14 +66,14 @@ func (d *BasicThreatDetector) updateWhitelist(ips []string) error {
 			// CIDR network
 			_, network, err := net.ParseCIDR(ipStr)
 			if err != nil {
-				return core.NewError(core.ErrConfigInvalid, 
+				return core.NewError(core.ErrConfigInvalid,
 					"invalid CIDR network: "+ipStr, err)
 			}
 			d.whitelistedNets = append(d.whitelistedNets, network)
 		} else {
 			// Single IP
 			if net.ParseIP(ipStr) == nil {
-				return core.NewError(core.ErrConfigInvalid, 
+				return core.NewError(core.ErrConfigInvalid,
 					"invalid IP address: "+ipStr, nil)
 			}
 			d.whitelistedIPs[ipStr] = true
@@ -131,7 +131,7 @@ func (d *BasicThreatDetector) AnalyzeAttack(attempt *models.AttackAttempt) core.
 	shouldBlock := confidence >= 0.7 || attempt.Severity >= models.SeverityHigh
 
 	// Generate reason and recommendation
-	reason := fmt.Sprintf("Severity: %s, Confidence: %.2f, User: %s", 
+	reason := fmt.Sprintf("Severity: %s, Confidence: %.2f, User: %s",
 		attempt.Severity, confidence, attempt.Username)
 
 	var recommendedAction string
@@ -181,8 +181,8 @@ func (d *BasicThreatDetector) ShouldBlock(ip string, attempts []*models.AttackAt
 	}
 
 	// Block if we exceed threshold by count or by severity score
-	return recentAttempts >= d.config.FailureThreshold || 
-		   totalSeverityScore >= float64(d.config.FailureThreshold)*2.0
+	return recentAttempts >= d.config.FailureThreshold ||
+		totalSeverityScore >= float64(d.config.FailureThreshold)*2.0
 }
 
 // IsWhitelisted checks if an IP is whitelisted
@@ -264,7 +264,7 @@ func (d *BasicThreatDetector) GetThreatScore(attempts []*models.AttackAttempt) f
 		// Decrease score based on age (more recent = higher score)
 		ageWeight := 1.0 - (age.Seconds() / d.config.LookbackDuration.Seconds())
 		severityMultiplier := d.config.SeverityMultipliers[attempt.Severity]
-		
+
 		score += ageWeight * severityMultiplier
 	}
 

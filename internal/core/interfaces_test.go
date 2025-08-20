@@ -11,11 +11,11 @@ import (
 // Mock implementations for testing
 
 type mockPlatformProvider struct {
-	name        string
-	supported   bool
-	blockedIPs  map[string]bool
-	logPaths    map[string][]string
-	serviceErr  error
+	name       string
+	supported  bool
+	blockedIPs map[string]bool
+	logPaths   map[string][]string
+	serviceErr error
 }
 
 func newMockPlatformProvider(name string, supported bool) *mockPlatformProvider {
@@ -101,11 +101,11 @@ func TestMockPlatformProvider(t *testing.T) {
 		if provider.Name() != "mock" {
 			t.Errorf("expected name 'mock', got %s", provider.Name())
 		}
-		
+
 		if !provider.IsSupported() {
 			t.Error("expected platform to be supported")
 		}
-		
+
 		if err := provider.RequirementsCheck(); err != nil {
 			t.Errorf("unexpected requirements error: %v", err)
 		}
@@ -113,7 +113,7 @@ func TestMockPlatformProvider(t *testing.T) {
 
 	t.Run("IP blocking", func(t *testing.T) {
 		testIP := "192.168.1.100"
-		
+
 		// Initially not blocked
 		blocked, err := provider.IsBlocked(testIP)
 		if err != nil {
@@ -122,13 +122,13 @@ func TestMockPlatformProvider(t *testing.T) {
 		if blocked {
 			t.Error("IP should not be blocked initially")
 		}
-		
+
 		// Block IP
 		err = provider.BlockIP(testIP, time.Hour, "test block")
 		if err != nil {
 			t.Errorf("unexpected error blocking IP: %v", err)
 		}
-		
+
 		// Should now be blocked
 		blocked, err = provider.IsBlocked(testIP)
 		if err != nil {
@@ -137,7 +137,7 @@ func TestMockPlatformProvider(t *testing.T) {
 		if !blocked {
 			t.Error("IP should be blocked after BlockIP call")
 		}
-		
+
 		// List blocked IPs should include our IP
 		blockedIPs, err := provider.ListBlockedIPs()
 		if err != nil {
@@ -153,13 +153,13 @@ func TestMockPlatformProvider(t *testing.T) {
 		if !found {
 			t.Error("blocked IP not found in list")
 		}
-		
+
 		// Unblock IP
 		err = provider.UnblockIP(testIP)
 		if err != nil {
 			t.Errorf("unexpected error unblocking IP: %v", err)
 		}
-		
+
 		// Should no longer be blocked
 		blocked, err = provider.IsBlocked(testIP)
 		if err != nil {
@@ -178,11 +178,11 @@ func TestLogEvent(t *testing.T) {
 		Line:      "test log line",
 		Service:   "ssh",
 	}
-	
+
 	if event.Source == "" {
 		t.Error("source should not be empty")
 	}
-	
+
 	if event.Service == "" {
 		t.Error("service should not be empty")
 	}
@@ -196,11 +196,11 @@ func TestThreatAssessment(t *testing.T) {
 		Reason:            "Multiple failed login attempts",
 		RecommendedAction: "Block IP for 1 hour",
 	}
-	
+
 	if assessment.Confidence < 0 || assessment.Confidence > 1 {
 		t.Error("confidence should be between 0 and 1")
 	}
-	
+
 	if assessment.Severity == models.SeverityHigh && !assessment.ShouldBlock {
 		t.Error("high severity attacks should typically be blocked")
 	}
@@ -213,11 +213,11 @@ func TestServiceStatus(t *testing.T) {
 		StartTime: time.Now().Add(-time.Hour),
 		Error:     nil,
 	}
-	
+
 	if !status.Running && status.PID > 0 {
 		t.Error("running status and PID are inconsistent")
 	}
-	
+
 	if status.StartTime.After(time.Now()) {
 		t.Error("start time cannot be in the future")
 	}
@@ -234,19 +234,19 @@ func TestGuardianStatus(t *testing.T) {
 		Version:           "1.0.0",
 		ConfigPath:        "/etc/guardian/config.yaml",
 	}
-	
+
 	if len(status.MonitoredServices) == 0 {
 		t.Error("should have at least one monitored service")
 	}
-	
+
 	if status.ActiveBlocks < 0 {
 		t.Error("active blocks cannot be negative")
 	}
-	
+
 	if status.TotalAttacks < 0 {
 		t.Error("total attacks cannot be negative")
 	}
-	
+
 	if status.Platform == "" {
 		t.Error("platform should not be empty")
 	}

@@ -51,13 +51,13 @@ func TestDefaultConfig(t *testing.T) {
 	}
 
 	if len(config.Blocking.WhitelistedIPs) != len(expectedWhitelist) {
-		t.Errorf("expected %d whitelisted IPs, got %d", 
+		t.Errorf("expected %d whitelisted IPs, got %d",
 			len(expectedWhitelist), len(config.Blocking.WhitelistedIPs))
 	}
 
 	for i, expected := range expectedWhitelist {
 		if i >= len(config.Blocking.WhitelistedIPs) || config.Blocking.WhitelistedIPs[i] != expected {
-			t.Errorf("expected whitelisted IP %s at index %d, got %s", 
+			t.Errorf("expected whitelisted IP %s at index %d, got %s",
 				expected, i, config.Blocking.WhitelistedIPs[i])
 		}
 	}

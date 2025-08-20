@@ -82,11 +82,11 @@ func TestBasicThreatDetector_AnalyzeAttack(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		attack         *models.AttackAttempt
-		expectBlock    bool
-		minConfidence  float64
-		maxConfidence  float64
+		name          string
+		attack        *models.AttackAttempt
+		expectBlock   bool
+		minConfidence float64
+		maxConfidence float64
 	}{
 		{
 			name: "critical severity attack",
@@ -143,7 +143,7 @@ func TestBasicThreatDetector_AnalyzeAttack(t *testing.T) {
 			}
 
 			if assessment.Confidence < tt.minConfidence || assessment.Confidence > tt.maxConfidence {
-				t.Errorf("confidence %f not in expected range [%f, %f]", 
+				t.Errorf("confidence %f not in expected range [%f, %f]",
 					assessment.Confidence, tt.minConfidence, tt.maxConfidence)
 			}
 
@@ -170,11 +170,11 @@ func TestBasicThreatDetector_AnalyzeAttackNil(t *testing.T) {
 	}
 
 	assessment := detector.AnalyzeAttack(nil)
-	
+
 	if assessment.ShouldBlock {
 		t.Error("nil attack should not result in blocking")
 	}
-	
+
 	if assessment.Confidence != 0.0 {
 		t.Errorf("expected confidence 0.0 for nil attack, got %f", assessment.Confidence)
 	}
@@ -350,11 +350,11 @@ func TestBasicThreatDetector_InvalidWhitelist(t *testing.T) {
 			}
 
 			_, err := NewBasicThreatDetector(config)
-			
+
 			if tt.expectError && err == nil {
 				t.Error("expected error but got none")
 			}
-			
+
 			if !tt.expectError && err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

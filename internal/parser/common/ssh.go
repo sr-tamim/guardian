@@ -98,7 +98,7 @@ func (p *SSHParser) ParseLine(line string) (*models.AttackAttempt, error) {
 
 		// Validate IP address
 		if ip != "" && net.ParseIP(ip) == nil {
-			return nil, core.NewError(core.ErrLogParseError, 
+			return nil, core.NewError(core.ErrLogParseError,
 				fmt.Sprintf("invalid IP address in log: %s", ip), nil)
 		}
 
