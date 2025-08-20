@@ -6,12 +6,16 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+	"github.com/sr-tamim/guardian/pkg/models"
 )
 
 var (
-	version   string
-	buildTime string
-	devMode   bool
+	version    string
+	buildTime  string
+	devMode    bool
+	configFile string
+	config     *models.Config
 )
 
 func main() {
@@ -35,13 +39,28 @@ var monitorCmd = &cobra.Command{
 	Short: "Start monitoring logs for intrusion attempts",
 	Long:  "Start the Guardian monitoring daemon to watch log files for intrusion attempts and automatically block malicious IPs.",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Load configuration
+		if err := loadConfig(); err != nil {
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+
 		fmt.Printf("🛡️  Guardian v%s starting...\n", getVersionString())
 		fmt.Printf("⚙️  Development mode: %v\n", devMode)
-		fmt.Println("📊 Monitoring system logs for intrusion attempts...")
+		fmt.Printf("📊 Monitoring %d services...\n", len(config.Services))
+
+		// Show enabled services
+		for _, service := range config.Services {
+			if service.Enabled {
+				fmt.Printf("   📝 %s: %s\n", service.Name, service.LogPath)
+			}
+		}
+
+		fmt.Printf("🚫 Failure threshold: %d attempts\n", config.Blocking.FailureThreshold)
+		fmt.Printf("⏰ Block duration: %v\n", config.Blocking.BlockDuration)
 
 		if devMode {
 			fmt.Println("🧪 Running in development mode - no real blocking will occur")
-			fmt.Println("📝 Use mock data and simulation for testing")
+			fmt.Println("📝 Using mock data and simulation for testing")
 		}
 
 		// For now, just show that it's working
@@ -49,7 +68,7 @@ var monitorCmd = &cobra.Command{
 
 		// Simple loop to keep the program running
 		for {
-			time.Sleep(5 * time.Second)
+			time.Sleep(config.Monitoring.CheckInterval)
 			fmt.Printf("⏰ %s - System monitoring active...\n", time.Now().Format("15:04:05"))
 		}
 	},
@@ -74,10 +93,47 @@ var statusCmd = &cobra.Command{
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().BoolVar(&devMode, "dev", false, "Enable development mode")
+	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Configuration file path")
 
 	// Add subcommands
 	rootCmd.AddCommand(monitorCmd)
 	rootCmd.AddCommand(statusCmd)
+}
+
+// loadConfig loads configuration from file or uses defaults
+func loadConfig() error {
+	if devMode {
+		config = models.DefaultConfig()
+		return nil
+	}
+
+	// If config file is specified, use it
+	if configFile != "" {
+		viper.SetConfigFile(configFile)
+	} else {
+		// Look for config in standard locations
+		viper.SetConfigName("development")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("./configs")
+		viper.AddConfigPath("$HOME/.config/guardian")
+		viper.AddConfigPath("/etc/guardian")
+	}
+
+	if err := viper.ReadInConfig(); err != nil {
+		if devMode {
+			// In dev mode, fallback to defaults if config not found
+			config = models.DefaultConfig()
+			return nil
+		}
+		return fmt.Errorf("error reading config file: %w", err)
+	}
+
+	config = &models.Config{}
+	if err := viper.Unmarshal(config); err != nil {
+		return fmt.Errorf("error unmarshaling config: %w", err)
+	}
+
+	return nil
 }
 
 func getVersionString() string {
