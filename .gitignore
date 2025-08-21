@@ -48,6 +48,9 @@ production.yaml
 *.db
 *.sqlite
 
+# AI instructions (may contain sensitive architectural details)
+.github/copilot-instructions.md
+
 # Temporary files
 /tmp/
 *.tmp
