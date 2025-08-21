@@ -1,7 +1,11 @@
 package models
 
 import (
+	"runtime"
+	"strings"
 	"time"
+
+	"github.com/sr-tamim/guardian/pkg/utils"
 )
 
 // Config represents the complete Guardian configuration
@@ -28,6 +32,27 @@ type BlockingConfig struct {
 	MaxConcurrentBlocks int           `yaml:"max_concurrent_blocks" json:"max_concurrent_blocks"`
 	WhitelistedIPs      []string      `yaml:"whitelisted_ips" json:"whitelisted_ips"`
 	AutoUnblock         bool          `yaml:"auto_unblock" json:"auto_unblock"`
+	RuleNameTemplate    string        `yaml:"rule_name_template" json:"rule_name_template"`
+}
+
+// GenerateRuleName creates a firewall rule name from the template
+// Supports placeholders: {app}, {timestamp}, {ip}, {service}
+// Default template: "Guardian - {timestamp} - {ip}"
+func (b *BlockingConfig) GenerateRuleName(ip, service string) string {
+	template := b.RuleNameTemplate
+	if template == "" {
+		template = "Guardian - {timestamp} - {ip}" // Default fallback
+	}
+
+	timestamp := time.Now().Format("20060102150405") // yyyyMMddHHmmss format
+
+	// Replace placeholders
+	template = strings.ReplaceAll(template, "{app}", "Guardian")
+	template = strings.ReplaceAll(template, "{timestamp}", timestamp)
+	template = strings.ReplaceAll(template, "{ip}", ip)
+	template = strings.ReplaceAll(template, "{service}", service)
+
+	return template
 }
 
 // LoggingConfig holds logging configuration
@@ -47,6 +72,23 @@ type StorageConfig struct {
 
 // DefaultConfig returns a default configuration suitable for development
 func DefaultConfig() *Config {
+	paths := utils.NewPlatformPaths()
+
+	// Development-friendly paths
+	var logPath, dbPath, serviceLogPath string
+
+	if runtime.GOOS == "windows" {
+		// Windows development paths
+		logPath = paths.GetDefaultGuardianLogPath()
+		dbPath = paths.GetDefaultGuardianDatabasePath()
+		serviceLogPath = paths.GetDefaultServiceLogPaths("SSH")[0] // First available path
+	} else {
+		// Unix-like development paths (use temp for safety)
+		logPath = "/tmp/guardian-dev.log"
+		dbPath = "/tmp/guardian-dev.db"
+		serviceLogPath = "/tmp/guardian_test_auth.log"
+	}
+
 	return &Config{
 		Monitoring: MonitoringConfig{
 			LookbackDuration: 10 * time.Minute,
@@ -64,23 +106,24 @@ func DefaultConfig() *Config {
 				"192.168.0.0/16",
 				"10.0.0.0/8",
 			},
-			AutoUnblock: true,
+			AutoUnblock:      true,
+			RuleNameTemplate: "Guardian - {timestamp} - {ip}", // Default template
 		},
 		Logging: LoggingConfig{
 			Level:      "debug",
 			Format:     "text",
 			Output:     "stdout",
 			EnableFile: false,
-			FilePath:   "/tmp/guardian-dev.log",
+			FilePath:   logPath, // Platform-aware path
 		},
 		Storage: StorageConfig{
 			Type:     "memory",
-			FilePath: "/tmp/guardian-dev.db",
+			FilePath: dbPath, // Platform-aware path
 		},
 		Services: []ServiceConfig{
 			{
 				Name:            "SSH",
-				LogPath:         "/tmp/guardian_test_auth.log",
+				LogPath:         serviceLogPath, // Platform-aware path
 				LogPattern:      "sshd",
 				CustomThreshold: 0,
 				Enabled:         true,
@@ -91,6 +134,8 @@ func DefaultConfig() *Config {
 
 // ProductionConfig returns a production-ready configuration
 func ProductionConfig() *Config {
+	paths := utils.NewPlatformPaths()
+
 	return &Config{
 		Monitoring: MonitoringConfig{
 			LookbackDuration: 1 * time.Hour,
@@ -107,41 +152,89 @@ func ProductionConfig() *Config {
 				"::1",
 				"192.168.1.0/24",
 			},
-			AutoUnblock: true,
+			AutoUnblock:      true,
+			RuleNameTemplate: "Guardian - {timestamp} - {ip}", // Default template
 		},
 		Logging: LoggingConfig{
 			Level:      "info",
 			Format:     "text",
 			Output:     "stdout",
 			EnableFile: false,
-			FilePath:   "/var/log/guardian/guardian.log",
+			FilePath:   paths.GetDefaultGuardianLogPath(), // Platform-aware path
 		},
 		Storage: StorageConfig{
 			Type:     "sqlite",
-			FilePath: "/var/lib/guardian/guardian.db",
+			FilePath: paths.GetDefaultGuardianDatabasePath(), // Platform-aware path
 		},
-		Services: []ServiceConfig{
-			{
-				Name:            "SSH",
-				LogPath:         "/var/log/auth.log",
-				LogPattern:      "sshd",
-				CustomThreshold: 0,
-				Enabled:         true,
-			},
-			{
+		Services: createPlatformServices(paths),
+	}
+}
+
+// createPlatformServices creates platform-specific service configurations
+func createPlatformServices(paths *utils.PlatformPaths) []ServiceConfig {
+	var services []ServiceConfig
+
+	// SSH service (available on all platforms but different log locations)
+	sshPaths := paths.GetDefaultServiceLogPaths("SSH")
+	if len(sshPaths) > 0 {
+		services = append(services, ServiceConfig{
+			Name:            "SSH",
+			LogPath:         sshPaths[0], // Use first available path
+			LogPattern:      "sshd",
+			CustomThreshold: 0,
+			Enabled:         true,
+		})
+	}
+
+	// Platform-specific services
+	switch runtime.GOOS {
+	case "windows":
+		// Windows RDP service
+		services = append(services, ServiceConfig{
+			Name:            "RDP",
+			LogPath:         "Security", // Windows Event Log
+			LogPattern:      "4625",     // Failed logon event ID
+			CustomThreshold: 0,
+			Enabled:         true,
+		})
+
+		// Windows IIS (if available)
+		iisPaths := paths.GetDefaultServiceLogPaths("IIS")
+		if len(iisPaths) > 0 {
+			services = append(services, ServiceConfig{
+				Name:            "IIS",
+				LogPath:         iisPaths[0],
+				LogPattern:      "iis",
+				CustomThreshold: 10,
+				Enabled:         false,
+			})
+		}
+
+	case "linux", "darwin":
+		// Apache service
+		apachePaths := paths.GetDefaultServiceLogPaths("Apache")
+		if len(apachePaths) > 0 {
+			services = append(services, ServiceConfig{
 				Name:            "Apache",
-				LogPath:         "/var/log/apache2/access.log",
+				LogPath:         apachePaths[0],
 				LogPattern:      "apache",
 				CustomThreshold: 10,
 				Enabled:         false,
-			},
-			{
+			})
+		}
+
+		// Nginx service
+		nginxPaths := paths.GetDefaultServiceLogPaths("Nginx")
+		if len(nginxPaths) > 0 {
+			services = append(services, ServiceConfig{
 				Name:            "Nginx",
-				LogPath:         "/var/log/nginx/access.log",
+				LogPath:         nginxPaths[0],
 				LogPattern:      "nginx",
 				CustomThreshold: 10,
 				Enabled:         false,
-			},
-		},
+			})
+		}
 	}
+
+	return services
 }

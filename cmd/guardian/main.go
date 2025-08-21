@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"time"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/sr-tamim/guardian/internal/platform"
 	"github.com/sr-tamim/guardian/pkg/models"
 )
 
@@ -63,14 +66,55 @@ var monitorCmd = &cobra.Command{
 			fmt.Println("📝 Using mock data and simulation for testing")
 		}
 
-		// For now, just show that it's working
+		// Create platform provider
+		factory := platform.NewFactory()
+		provider, err := factory.CreateProvider(devMode, config)
+		if err != nil {
+			return fmt.Errorf("failed to create platform provider: %w", err)
+		}
+
+		fmt.Printf("🖥️  Platform: %s\n", provider.Name())
 		fmt.Println("✅ Guardian is ready! (Press Ctrl+C to stop)")
 
-		// Simple loop to keep the program running
-		for {
-			time.Sleep(config.Monitoring.CheckInterval)
-			fmt.Printf("⏰ %s - System monitoring active...\n", time.Now().Format("15:04:05"))
+		// Set up context for graceful shutdown
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Handle shutdown signals
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		// Start monitoring for enabled services
+		for _, service := range config.Services {
+			if service.Enabled {
+				logPaths, err := provider.GetLogPaths(service.Name)
+				if err != nil {
+					fmt.Printf("❌ Failed to get log paths for %s: %v\n", service.Name, err)
+					continue
+				}
+
+				for _, logPath := range logPaths {
+					go func(path, serviceName string) {
+						// Start log monitoring (this will spawn background goroutines)
+						if err := provider.StartLogMonitoring(ctx, path, nil); err != nil {
+							fmt.Printf("❌ Failed to start monitoring %s: %v\n", path, err)
+						}
+					}(logPath, service.Name)
+				}
+			}
 		}
+
+		// Wait for shutdown signal
+		select {
+		case <-sigChan:
+			fmt.Println("\n🛑 Received shutdown signal...")
+		case <-ctx.Done():
+			fmt.Println("\n🛑 Context cancelled...")
+		}
+
+		cancel()
+		fmt.Println("👋 Guardian stopped gracefully")
+		return nil
 	},
 }
 
@@ -102,33 +146,47 @@ func init() {
 
 // loadConfig loads configuration from file or uses defaults
 func loadConfig() error {
-	if devMode {
-		config = models.DefaultConfig()
-		return nil
-	}
-
 	// If config file is specified, use it
 	if configFile != "" {
 		viper.SetConfigFile(configFile)
+		if err := viper.ReadInConfig(); err != nil {
+			return fmt.Errorf("error reading specified config file: %w", err)
+		}
+	} else if !devMode {
+		// In production mode, look for config in standard locations
+		viper.SetConfigName("guardian")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("./configs")
+		viper.AddConfigPath("$HOME/.config/guardian")
+		viper.AddConfigPath("/etc/guardian")
+
+		if err := viper.ReadInConfig(); err != nil {
+			return fmt.Errorf("error reading config file: %w", err)
+		}
 	} else {
-		// Look for config in standard locations
+		// In dev mode without explicit config, look for development config
 		viper.SetConfigName("development")
 		viper.SetConfigType("yaml")
 		viper.AddConfigPath("./configs")
 		viper.AddConfigPath("$HOME/.config/guardian")
 		viper.AddConfigPath("/etc/guardian")
-	}
 
-	if err := viper.ReadInConfig(); err != nil {
-		if devMode {
-			// In dev mode, fallback to defaults if config not found
+		// If development config found, use it; otherwise fall back to defaults
+		if err := viper.ReadInConfig(); err != nil {
+			// Fallback to platform-aware defaults
 			config = models.DefaultConfig()
 			return nil
 		}
-		return fmt.Errorf("error reading config file: %w", err)
 	}
 
-	config = &models.Config{}
+	// Start with platform-aware defaults, then overlay with config file values
+	if devMode {
+		config = models.DefaultConfig()
+	} else {
+		config = models.ProductionConfig()
+	}
+
+	// Unmarshal config file values on top of defaults (this merges intelligently)
 	if err := viper.Unmarshal(config); err != nil {
 		return fmt.Errorf("error unmarshaling config: %w", err)
 	}
