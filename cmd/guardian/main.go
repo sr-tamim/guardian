@@ -11,11 +11,10 @@ import (
 	"github.com/spf13/viper"
 	"github.com/sr-tamim/guardian/internal/platform"
 	"github.com/sr-tamim/guardian/pkg/models"
+	"github.com/sr-tamim/guardian/pkg/version"
 )
 
 var (
-	version    string
-	buildTime  string
 	devMode    bool
 	configFile string
 	config     *models.Config
@@ -34,7 +33,7 @@ var rootCmd = &cobra.Command{
 	Long: `Guardian is a modern, cross-platform intrusion prevention system that monitors 
 log files and automatically blocks malicious IP addresses. Built as a contemporary 
 alternative to fail2ban with a beautiful terminal interface and intelligent threat detection.`,
-	Version: getVersionString(),
+	Version: version.GetVersion(),
 }
 
 var monitorCmd = &cobra.Command{
@@ -47,7 +46,7 @@ var monitorCmd = &cobra.Command{
 			return fmt.Errorf("failed to load configuration: %w", err)
 		}
 
-		fmt.Printf("🛡️  Guardian v%s starting...\n", getVersionString())
+		fmt.Printf("🛡️  Guardian v%s starting...\n", version.GetVersion())
 		fmt.Printf("⚙️  Development mode: %v\n", devMode)
 		fmt.Printf("📊 Monitoring %d services...\n", len(config.Services))
 
@@ -123,13 +122,39 @@ var statusCmd = &cobra.Command{
 	Short: "Show Guardian status and statistics",
 	Long:  "Display current Guardian status, active blocks, and monitoring statistics.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Printf("🛡️  Guardian Status v%s\n", getVersionString())
+		versionInfo := version.Get()
+		fmt.Printf("🛡️  Guardian Status v%s\n", versionInfo.Version)
 		fmt.Println("════════════════════════════════")
-		fmt.Printf("📅 Build Time: %s\n", getBuildTime())
+		fmt.Printf("📅 Build Time: %s\n", version.GetBuildTime())
+		fmt.Printf("🔧 Git Commit: %s\n", version.GetShortCommit())
+		fmt.Printf("🐹 Go Version: %s\n", versionInfo.GoVersion)
+		fmt.Printf("🖥️  Platform: %s/%s\n", versionInfo.Platform, versionInfo.Arch)
 		fmt.Printf("⚙️  Development Mode: %v\n", devMode)
 		fmt.Println("📊 Status: Not implemented yet")
 		fmt.Println("🚫 Active Blocks: 0")
 		fmt.Println("👀 Monitoring: Not active")
+		return nil
+	},
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Show detailed version information",
+	Long:  "Display detailed version information including build time and git commit.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		versionInfo := version.Get()
+		fmt.Println(versionInfo.String())
+		fmt.Printf("\n📦 Build Details:\n")
+		fmt.Printf("   Version: %s\n", versionInfo.Version)
+		fmt.Printf("   Git Commit: %s\n", versionInfo.GitCommit)
+		fmt.Printf("   Build Time: %s\n", version.GetBuildTime())
+		fmt.Printf("   Go Version: %s\n", versionInfo.GoVersion)
+		fmt.Printf("   Platform: %s/%s\n", versionInfo.Platform, versionInfo.Arch)
+		if version.IsDevelopment() {
+			fmt.Printf("   Build Type: Development\n")
+		} else {
+			fmt.Printf("   Build Type: Release\n")
+		}
 		return nil
 	},
 }
@@ -142,6 +167,7 @@ func init() {
 	// Add subcommands
 	rootCmd.AddCommand(monitorCmd)
 	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(versionCmd)
 }
 
 // loadConfig loads configuration from file or uses defaults
@@ -192,18 +218,4 @@ func loadConfig() error {
 	}
 
 	return nil
-}
-
-func getVersionString() string {
-	if version == "" {
-		return "dev"
-	}
-	return version
-}
-
-func getBuildTime() string {
-	if buildTime == "" {
-		return "unknown"
-	}
-	return buildTime
 }

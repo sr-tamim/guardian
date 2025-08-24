@@ -51,6 +51,9 @@ production.yaml
 # AI instructions (may contain sensitive architectural details)
 .github/copilot-instructions.md
 
+# Deployment directory (server-specific files, generated from source)
+deploy/
+
 # Temporary files
 /tmp/
 *.tmp
@@ -58,3 +61,6 @@ production.yaml
 # Draft files (development)
 draft-files.md
 filesystem-diagram.md
+
+# Backup files from scripts
+*.bak
