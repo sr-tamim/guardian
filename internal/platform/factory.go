@@ -17,7 +17,6 @@ func NewFactory() *Factory {
 }
 
 // CreateProvider creates the appropriate platform provider
-// For now, always returns MockProvider. Later we'll add real platform detection.
 func (f *Factory) CreateProvider(devMode bool, config *models.Config) (core.PlatformProvider, error) {
 	if devMode {
 		return mock.NewMockProvider(config), nil
@@ -26,13 +25,12 @@ func (f *Factory) CreateProvider(devMode bool, config *models.Config) (core.Plat
 	// In production, detect the actual platform
 	switch runtime.GOOS {
 	case "windows":
-		// TODO: return windows.NewWindowsProvider(config)
-		return mock.NewMockProvider(config), nil // Use mock for now
+		return createWindowsProvider(config), nil
 	case "linux":
-		// TODO: return linux.NewLinuxProvider(config)
+		// TODO: return createLinuxProvider(config), nil
 		return mock.NewMockProvider(config), nil // Use mock for now
 	case "darwin":
-		// TODO: return darwin.NewDarwinProvider(config)
+		// TODO: return createDarwinProvider(config), nil
 		return mock.NewMockProvider(config), nil // Use mock for now
 	default:
 		return mock.NewMockProvider(config), nil

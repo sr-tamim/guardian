@@ -1,0 +1,36 @@
+monitoring:
+  lookback_duration: "1h"
+  check_interval: "30s"
+  enable_real_time: true
+  log_buffer_size: 1000
+
+blocking:
+  failure_threshold: 5
+  block_duration: "20h"
+  max_concurrent_blocks: 1000
+  whitelisted_ips:
+    - "127.0.0.1"
+    - "::1"
+    - "192.168.1.0/24"
+  auto_unblock: true
+  rule_name_template: "Guardian - {timestamp} - {ip}"
+
+logging:
+  level: "info"
+  format: "text"
+  output: "stdout"
+  enable_file: false
+  # Platform-aware path will be used if commented out
+  # file_path: "C:\\ProgramData\\Guardian\\logs\\guardian.log"
+
+storage:
+  type: "sqlite"
+  # Platform-aware path will be used if commented out
+  # file_path: "C:\\ProgramData\\Guardian\\data\\guardian.db"
+
+services:
+  - name: "RDP"
+    log_path: "Security"  # Windows Event Log
+    log_pattern: "4625"   # Failed logon event ID
+    custom_threshold: 0
+    enabled: true
