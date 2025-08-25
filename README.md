@@ -1,19 +1,52 @@
 # Guardian - Modern Cross-Platform Intrusion Prevention System
 
-> **Next-generation fail2ban built with Go** - Beautiful TUI, cross-platform architecture, and intelligent threat detection
+> **Next-generation fail2ban built with Go** - Interactive TUI dashboard, cross-platform architecture, and intelligent threat detection
 
 ## 🎯 Project Overview
 
-**Guardian** is a modern, cross-platform intrusion prevention system that monitors log files and automatically blocks malicious IP addresses. Built as a contemporary alternative to fail2ban, it features a beautiful terminal interface, intelligent threat detection, and seamless cross-platform deployment.
+**Guardian** is a modern, cross-platform intrusion prevention system that monitors log files and automatically blocks malicious IP addresses. Built as a contemporary alternative to fail2ban, it features an interactive terminal dashboard, intelligent threat detection, and seamless cross-platform deployment.
 
 ### 🔥 Key Value Propositions
 - **60x faster** than fail2ban (Go vs Python performance)
 - **Cross-platform** from day one (Linux, Windows, macOS)
-- **Beautiful TUI** with real-time attack visualization
+- **Interactive TUI** with real-time attack visualization and service management
 - **Zero-dependency** deployment (single binary)
 - **Enterprise-ready** architecture with platform abstraction
 
 ---
+
+## ✨ Core Features
+
+### 🛡️ **Intelligent Protection**
+- **Real-time log monitoring** with multiple parsing engines
+- **Automatic IP blocking** via platform-native firewalls
+- **Smart threat detection** with pattern analysis
+- **Configurable thresholds** per service and global
+- **Auto-expiring blocks** with customizable durations
+- **IP whitelisting** for trusted addresses
+
+### 🖥️ **Interactive Dashboard (v0.0.2)**
+- **Real-time TUI dashboard** with live statistics and monitoring
+- **Tab navigation** (Dashboard, Blocked IPs, Logs, Service, Settings)
+- **Service management** with start/stop controls
+- **Live refresh** functionality with real-time updates
+- **Development/Production** mode indicators
+- **Keyboard shortcuts** for efficient management
+- **Beautiful styling** with Lip Gloss framework
+
+### 🔧 **Enterprise Features**
+- **Service management** (systemd, Windows Service, launchd)
+- **Configuration management** with YAML configs
+- **Persistent storage** with SQLite backend
+- **Logging integration** (syslog, Event Log, file)
+- **Statistics tracking** and reporting
+- **Notification system** (email, webhooks, desktop)
+
+### 🌍 **Cross-Platform Support**
+- **Linux**: iptables + systemd + inotify monitoring
+- **Windows**: Windows Firewall + Service + Event Log ✅ (v0.0.1 Complete)
+- **macOS**: pfctl + launchd + FSEvents monitoring
+- **Future**: FreeBSD, OpenBSD, Docker, Kubernetes
 
 ## ✨ Core Features
 
@@ -48,7 +81,45 @@
 
 ---
 
-## 🛠️ Technology Stack
+## �️ Interactive TUI Dashboard (v0.0.2)
+
+Guardian now features a beautiful interactive terminal interface for desktop-friendly monitoring and management.
+
+### **Quick Start**
+```bash
+# Launch TUI in development mode
+./guardian --dev tui
+
+# Launch TUI in production mode  
+./guardian tui
+```
+
+### **TUI Navigation**
+| Key | Action |
+|-----|--------|
+| `Tab` / `Shift+Tab` | Navigate between tabs |
+| `r` | Refresh data and statistics |
+| `s` | Toggle service (in Service tab) |
+| `q` | Quit application |
+
+### **Available Tabs**
+1. **Dashboard** - Service status and protection statistics
+2. **Blocked IPs** - Currently blocked addresses and history
+3. **Logs** - Recent activity and attack attempts
+4. **Service** - Service management and configuration
+5. **Settings** - Configuration options and preferences
+
+### **Features**
+- **Real-time updates** with automatic refresh
+- **Service management** with start/stop controls
+- **Live statistics** showing blocked IPs and attack counts
+- **Mode indicators** (Development/Production)
+- **Platform integration** with Windows Event Log and Firewall
+- **Beautiful styling** with professional terminal UI
+
+---
+
+## �🛠️ Technology Stack
 
 ### **Core Language & Runtime**
 - **Go 1.21+** - Performance, concurrency, cross-compilation

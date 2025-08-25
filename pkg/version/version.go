@@ -8,7 +8,7 @@ import (
 
 // Build-time variables set by ldflags
 var (
-	Version   = "0.0.1"           // Semantic version
+  Version   = "0.0.2"
 	GitCommit = "unknown"         // Git commit hash
 	BuildTime = "unknown"         // Build timestamp
 	GoVersion = runtime.Version() // Go version used

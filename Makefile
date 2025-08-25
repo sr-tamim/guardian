@@ -2,7 +2,7 @@
 
 # Build variables
 BINARY_NAME=guardian
-VERSION=0.0.1
+VERSION=0.0.2
 GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_TIME=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS=-ldflags "-X github.com/sr-tamim/guardian/pkg/version.Version=$(VERSION) -X github.com/sr-tamim/guardian/pkg/version.GitCommit=$(GIT_COMMIT) -X github.com/sr-tamim/guardian/pkg/version.BuildTime=$(BUILD_TIME)"

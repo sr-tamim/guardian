@@ -1,5 +1,36 @@
 # Guardian Version History
 
+## Version 0.0.2 (2025-01-XX) - Interactive TUI Dashboard
+
+### 🎉 **Major Feature Release - Interactive Terminal Interface**
+
+#### ✨ **New Features**
+- **Interactive TUI Dashboard** - Full terminal user interface with Bubble Tea framework
+- **Tab Navigation System** - Dashboard, Blocked IPs, Logs, Service, and Settings tabs
+- **Real-time Service Management** - Start/stop controls via TUI interface
+- **Live Statistics Display** - Blocked IPs, attack counts, and update timestamps
+- **Platform Provider Integration** - Development/production mode indicators
+- **Beautiful Terminal Styling** - Professional UI using Lip Gloss framework
+- **Comprehensive Keyboard Shortcuts** - Tab navigation, refresh, service toggle, quit
+
+#### 🔧 **Technical Enhancements**
+- **TUI Command Integration** - New `guardian tui` command for interactive mode
+- **Enhanced CLI Architecture** - Provider factory integration with TUI
+- **Real-time Data Updates** - Live refresh functionality with provider communication
+- **Cross-Platform TUI** - Works seamlessly on Windows with provider integration
+
+#### 📚 **Documentation & Testing**
+- **TUI Usage Guide** - Comprehensive README section with keyboard shortcuts
+- **Interactive Demo Scripts** - Testing and demonstration utilities
+- **Enhanced Help System** - Detailed TUI command documentation
+
+#### 🛠️ **Dependencies Added**
+- Bubble Tea framework (github.com/charmbracelet/bubbletea)
+- Lip Gloss styling (github.com/charmbracelet/lipgloss)
+- Bubbles components (github.com/charmbracelet/bubbles)
+
+---
+
 ## Version 0.0.1 (2025-08-24)
 
 ### 🎉 **Initial Release - Windows-First Implementation**
