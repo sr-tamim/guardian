@@ -6,46 +6,43 @@ import (
 	"os"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"fyne.io/systray"
+	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/sr-tamim/guardian/internal/core"
-	"github.com/sr-tamim/guardian/pkg/version"
 )
 
 // ServiceManager handles TUI and background service integration
 type ServiceManager struct {
-	provider       core.PlatformProvider
-	devMode        bool
-	dashboard      *Dashboard
-	monitoring     bool
-	ctx            context.Context
-	cancel         context.CancelFunc
-	startup        *WindowsStartup
+	provider   core.PlatformProvider
+	devMode    bool
+	monitoring bool
+	ctx        context.Context
+	cancel     context.CancelFunc
+	startup    StartupManager
 }
 
 // NewServiceManager creates a new service manager
 func NewServiceManager(provider core.PlatformProvider, devMode bool) *ServiceManager {
 	ctx, cancel := context.WithCancel(context.Background())
-	
-	startup, _ := NewWindowsStartup() // Ignore error for non-Windows platforms
-	
+
+	startup := CreateStartupManager() // Use platform-agnostic creation
+
 	return &ServiceManager{
-		provider:  provider,
-		devMode:   devMode,
-		ctx:       ctx,
-		cancel:    cancel,
-		startup:   startup,
+		provider: provider,
+		devMode:  devMode,
+		ctx:      ctx,
+		cancel:   cancel,
+		startup:  startup,
 	}
 }
 
 // StartWithTraySupport starts the service with TUI and system tray integration
 func (sm *ServiceManager) StartWithTraySupport() error {
-	// Initialize system tray in a separate goroutine
-	go sm.initSystemTray()
-	
-	// Start TUI
-	return sm.startTUI()
+	// Start system tray first - this will block until tray exits
+	// TUI will be launched from within the tray menu
+	sm.initSystemTray()
+	return nil
 }
 
 // initSystemTray sets up the system tray functionality
@@ -55,12 +52,8 @@ func (sm *ServiceManager) initSystemTray() {
 
 // onTrayReady is called when system tray is ready
 func (sm *ServiceManager) onTrayReady() {
-	versionInfo := version.Get()
-	
-	// Set tray icon and tooltip
-	systray.SetIcon(getGuardianIcon())
-	systray.SetTitle("Guardian")
-	systray.SetTooltip(fmt.Sprintf("Guardian v%s - Protection Active", versionInfo.Version))
+	// Initialize tray display (platform-specific)
+	initializeTrayDisplay()
 
 	// Create menu items
 	mShowDashboard := systray.AddMenuItem("Show Dashboard", "Open Guardian TUI Dashboard")
@@ -68,12 +61,21 @@ func (sm *ServiceManager) onTrayReady() {
 	systray.AddSeparator()
 	mStartStop := systray.AddMenuItem("Start Monitoring", "Start/Stop Guardian monitoring")
 	systray.AddSeparator()
-	mAutoStart := systray.AddMenuItem("Auto-start with Windows", "Enable startup when Windows starts")
-	if sm.startup != nil && sm.startup.IsEnabled() {
+
+	// Platform-aware auto-start menu
+	autoStartDescription := fmt.Sprintf("Enable startup (%s)", sm.startup.GetDescription())
+	mAutoStart := systray.AddMenuItem("Auto-start on boot", autoStartDescription)
+	if sm.startup.IsEnabled() {
 		mAutoStart.Check()
 	}
+
 	systray.AddSeparator()
 	mExit := systray.AddMenuItem("Exit Guardian", "Stop Guardian and exit")
+
+	// Automatically show TUI dashboard on first launch
+	go func() {
+		sm.showTUI()
+	}()
 
 	// Handle menu actions
 	go func() {
@@ -81,10 +83,10 @@ func (sm *ServiceManager) onTrayReady() {
 			select {
 			case <-mShowDashboard.ClickedCh:
 				sm.showTUI()
-			
+
 			case <-mStatus.ClickedCh:
 				sm.showStatus()
-			
+
 			case <-mStartStop.ClickedCh:
 				sm.toggleMonitoring()
 				if sm.monitoring {
@@ -92,7 +94,7 @@ func (sm *ServiceManager) onTrayReady() {
 				} else {
 					mStartStop.SetTitle("Start Monitoring")
 				}
-			
+
 			case <-mAutoStart.ClickedCh:
 				if mAutoStart.Checked() {
 					sm.disableAutoStart()
@@ -101,7 +103,7 @@ func (sm *ServiceManager) onTrayReady() {
 					sm.enableAutoStart()
 					mAutoStart.Check()
 				}
-			
+
 			case <-mExit.ClickedCh:
 				sm.exitApplication()
 				return
@@ -115,26 +117,28 @@ func (sm *ServiceManager) onTrayExit() {
 	sm.cancel()
 }
 
-// startTUI launches the TUI dashboard
-func (sm *ServiceManager) startTUI() error {
-	sm.dashboard = NewDashboard()
-	sm.dashboard.SetProvider(sm.provider, sm.devMode)
-	
-	p := tea.NewProgram(
-		sm.dashboard,
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
-	
-	_, err := p.Run()
-	return err
-}
-
 // showTUI brings TUI to foreground (called from tray)
 func (sm *ServiceManager) showTUI() {
-	// In a real implementation, this would restore the TUI window
-	// For now, we'll start a new instance
-	go sm.startTUI()
+	// Launch TUI in a separate goroutine so it doesn't block the tray
+	go func() {
+		dashboard := NewDashboard()
+		dashboard.SetProvider(sm.provider, sm.devMode)
+
+		p := tea.NewProgram(
+			dashboard,
+			tea.WithAltScreen(),
+			tea.WithMouseCellMotion(),
+		)
+
+		// Run TUI - when it exits, return to tray (don't exit the whole app)
+		_, err := p.Run()
+		if err != nil {
+			fmt.Printf("TUI error: %v\n", err)
+		}
+
+		// TUI closed - Guardian continues in system tray
+		fmt.Println("📱 Guardian minimized to system tray - protection continues")
+	}()
 }
 
 // showStatus shows a status notification
@@ -151,7 +155,7 @@ func (sm *ServiceManager) showStatus() {
 	} else {
 		status += "Mode: Production"
 	}
-	
+
 	// This would show a native notification in a real implementation
 	fmt.Println(status)
 }
@@ -168,8 +172,8 @@ func (sm *ServiceManager) toggleMonitoring() {
 // startMonitoring begins the monitoring process
 func (sm *ServiceManager) startMonitoring() {
 	sm.monitoring = true
-	systray.SetTooltip("Guardian - Protection Active")
-	
+	updateTrayTooltip("Guardian - Protection Active")
+
 	// Start background monitoring
 	go sm.runBackgroundMonitoring()
 }
@@ -177,7 +181,7 @@ func (sm *ServiceManager) startMonitoring() {
 // stopMonitoring stops the monitoring process
 func (sm *ServiceManager) stopMonitoring() {
 	sm.monitoring = false
-	systray.SetTooltip("Guardian - Protection Stopped")
+	updateTrayTooltip("Guardian - Protection Stopped")
 }
 
 // runBackgroundMonitoring runs the actual monitoring service
@@ -196,35 +200,27 @@ func (sm *ServiceManager) runBackgroundMonitoring() {
 	}
 }
 
-// enableAutoStart adds Guardian to Windows startup
+// enableAutoStart adds Guardian to system startup
 func (sm *ServiceManager) enableAutoStart() error {
-	if sm.startup == nil {
-		return fmt.Errorf("Windows startup not supported on this platform")
-	}
-	
 	err := sm.startup.Enable()
 	if err != nil {
 		fmt.Printf("❌ Failed to enable auto-start: %v\n", err)
 		return err
 	}
-	
-	fmt.Println("✅ Auto-start enabled - Guardian will start with Windows")
+
+	fmt.Printf("✅ Auto-start enabled (%s)\n", sm.startup.GetDescription())
 	return nil
 }
 
-// disableAutoStart removes Guardian from Windows startup
+// disableAutoStart removes Guardian from system startup
 func (sm *ServiceManager) disableAutoStart() error {
-	if sm.startup == nil {
-		return fmt.Errorf("Windows startup not supported on this platform")
-	}
-	
 	err := sm.startup.Disable()
 	if err != nil {
 		fmt.Printf("❌ Failed to disable auto-start: %v\n", err)
 		return err
 	}
-	
-	fmt.Println("❌ Auto-start disabled - Guardian will not start automatically")
+
+	fmt.Printf("❌ Auto-start disabled (%s)\n", sm.startup.GetDescription())
 	return nil
 }
 

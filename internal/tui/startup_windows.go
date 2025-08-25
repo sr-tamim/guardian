@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 package tui
 
 import (
@@ -12,6 +15,45 @@ import (
 type WindowsStartup struct {
 	executablePath string
 	appName        string
+}
+
+// createPlatformStartupManager creates Windows-specific startup manager
+func createPlatformStartupManager() StartupManager {
+	startup, err := NewWindowsStartup()
+	if err != nil {
+		return &NoOpStartup{err: err}
+	}
+	return startup
+}
+
+// NoOpStartup provides fallback functionality when Windows startup fails
+type NoOpStartup struct {
+	err error
+}
+
+// Enable does nothing when startup manager fails to initialize
+func (nos *NoOpStartup) Enable() error {
+	return nos.err
+}
+
+// Disable does nothing when startup manager fails to initialize
+func (nos *NoOpStartup) Disable() error {
+	return nos.err
+}
+
+// IsEnabled returns false when startup manager fails to initialize
+func (nos *NoOpStartup) IsEnabled() bool {
+	return false
+}
+
+// GetDescription returns error description
+func (nos *NoOpStartup) GetDescription() string {
+	return fmt.Sprintf("Startup unavailable: %v", nos.err)
+}
+
+// GetDescription returns platform-specific description
+func (ws *WindowsStartup) GetDescription() string {
+	return "Windows Registry (HKEY_CURRENT_USER\\...\\Run)"
 }
 
 // NewWindowsStartup creates a new Windows startup manager
@@ -37,7 +79,7 @@ func (ws *WindowsStartup) Enable() error {
 
 	// Add the executable with --tui flag for automatic TUI startup
 	commandLine := fmt.Sprintf(`"%s" --tui`, ws.executablePath)
-	
+
 	err = key.SetStringValue(ws.appName, commandLine)
 	if err != nil {
 		return fmt.Errorf("failed to set registry value: %w", err)

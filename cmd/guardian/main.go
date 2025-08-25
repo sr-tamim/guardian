@@ -23,6 +23,17 @@ var (
 )
 
 func main() {
+	// Check if no arguments provided (double-click scenario)
+	if len(os.Args) == 1 {
+		// Default behavior: launch TUI directly
+		if err := launchTUIDirectly(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error launching Guardian: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Normal CLI execution with commands
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -36,6 +47,11 @@ var rootCmd = &cobra.Command{
 log files and automatically blocks malicious IP addresses. Built as a contemporary 
 alternative to fail2ban with a beautiful terminal interface and intelligent threat detection.`,
 	Version: version.GetVersion(),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Default behavior when no subcommand is provided (e.g., double-click)
+		// This automatically launches the TUI interface
+		return tuiCmd.RunE(cmd, args)
+	},
 }
 
 var monitorCmd = &cobra.Command{
@@ -180,12 +196,12 @@ var tuiCmd = &cobra.Command{
 
 		// Create service manager with TUI and tray support
 		serviceManager := tui.NewServiceManager(provider, devMode)
-		
+
 		fmt.Printf("🛡️  Guardian v%s with TUI & System Tray\n", version.GetVersion())
 		fmt.Printf("⚙️  Development mode: %v\n", devMode)
 		fmt.Printf("🖥️  Platform: %s\n", provider.Name())
 		fmt.Println("✨ Starting with system tray integration...")
-		
+
 		return serviceManager.StartWithTraySupport()
 	},
 }
@@ -250,6 +266,31 @@ func loadConfig() error {
 	}
 
 	return nil
+}
+
+// launchTUIDirectly starts the TUI interface directly (for double-click scenario)
+func launchTUIDirectly() error {
+	// Load configuration first
+	if err := loadConfig(); err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Create platform provider
+	factory := platform.NewFactory()
+	provider, err := factory.CreateProvider(devMode, config)
+	if err != nil {
+		return fmt.Errorf("failed to create platform provider: %w", err)
+	}
+
+	// Create service manager with TUI and tray support
+	serviceManager := tui.NewServiceManager(provider, devMode)
+
+	fmt.Printf("🛡️  Guardian v%s with TUI & System Tray\n", version.GetVersion())
+	fmt.Printf("⚙️  Development mode: %v\n", devMode)
+	fmt.Printf("🖥️  Platform: %s\n", provider.Name())
+	fmt.Println("✨ Starting with system tray integration...")
+
+	return serviceManager.StartWithTraySupport()
 }
 
 // createTUIDashboard creates a new TUI dashboard instance

@@ -21,16 +21,16 @@ type Dashboard struct {
 	height         int
 	ready          bool
 	quitting       bool
-	
+
 	// State
 	serviceRunning bool
 	blockedIPs     []string
 	attackCount    int64
 	lastUpdate     time.Time
-	
+
 	// Navigation
-	selectedTab    int
-	tabs           []string
+	selectedTab int
+	tabs        []string
 }
 
 // Tab constants
@@ -96,7 +96,7 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Minimize to tray instead of quit
 			d.quitting = true
 			return d, tea.Quit
-			
+
 		case "q":
 			// Quit but ask for confirmation if service is running
 			if d.serviceManager != nil && d.serviceManager.IsMonitoring() {
@@ -116,7 +116,7 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "shift+tab", "left":
 			d.selectedTab = (d.selectedTab - 1 + len(d.tabs)) % len(d.tabs)
 			return d, nil
-			
+
 		case "s":
 			// Toggle service through service manager if available
 			if d.selectedTab == TabService {
@@ -130,7 +130,7 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				d.lastUpdate = time.Now()
 				return d, nil
 			}
-			
+
 		case "r":
 			// Refresh data
 			if d.provider != nil {
@@ -270,11 +270,11 @@ func (d *Dashboard) renderDashboardTab() string {
 
 🛡️  Protection Status:
    • %s
-   • Windows RDP Monitoring: %s
-   • Windows Firewall: %s
+   • Platform Monitoring: %s
+   • Platform Firewall: %s
    • Real-time Detection: %s
 
-Press 'r' to refresh, 'tab' to navigate, 'q' to quit
+Press 'r' to refresh, 'tab' to navigate, 'q' to minimize to tray
 	`,
 		statusIcon, statusText, modeText,
 		d.attackCount,
@@ -350,7 +350,7 @@ func (d *Dashboard) renderServiceTab() string {
 
 Current Status: %s %s
 
-Windows Service: Not installed
+System Service: Not installed
 Background Mode: %s
 
 %s
@@ -379,7 +379,7 @@ Configuration:
    • Auto-cleanup: Enabled
    • Log Level: INFO
 
-Platform: Windows Provider
+Platform: Platform Provider
 Build: ` + version.GetBuildTime() + `
 
 Press 'r' to refresh, 'tab' to navigate
