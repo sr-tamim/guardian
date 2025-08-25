@@ -31,8 +31,8 @@ function update_version() {
     echo "📦 Updating version from $(get_current_version) to $new_version"
     
     # Update version.go
-    sed -i.bak "s/Version.*=.*/Version   = \"$new_version\"/" $VERSION_FILE
-    
+    sed -i.bak "s/^\s*Version\s*=\s*[^=].*/  Version   = \"$new_version\"/" $VERSION_FILE
+
     # Update Makefile  
     sed -i.bak "s/VERSION=.*/VERSION=$new_version/" Makefile
     
