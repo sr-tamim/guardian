@@ -18,6 +18,7 @@ import (
 func NewMonitorCmd(configLoader func() (*models.Config, error), devMode *bool) *cobra.Command {
 	var daemonMode bool
 	var daemonInternal bool
+	var trayMode bool
 
 	cmd := &cobra.Command{
 		Use:   "monitor",
@@ -44,12 +45,28 @@ func NewMonitorCmd(configLoader func() (*models.Config, error), devMode *bool) *
 			if daemonInternal {
 				// This is the actual daemon process, run monitoring directly
 				ctx := context.Background()
-				return daemonManager.RunMonitorInCurrentProcess(ctx)
+				if trayMode {
+					return daemonManager.RunMonitorWithTray(ctx)
+				} else {
+					return daemonManager.RunMonitorInCurrentProcess(ctx)
+				}
 			}
 
 			// Check if daemon mode is requested
 			if daemonMode {
-				return daemonManager.StartDaemon()
+				// Use tray support in daemon mode by default
+				return daemonManager.StartDaemonWithTray()
+			}
+
+			// Check if tray mode is requested (runs in current process with tray)
+			if trayMode {
+				fmt.Printf("🛡️  Guardian v%s starting with system tray...\n", version.GetVersion())
+				fmt.Printf("⚙️  Development mode: %v\n", *devMode)
+				fmt.Printf("🖼️  System tray integration enabled\n")
+				fmt.Println("✅ Guardian will run with system tray support!")
+
+				ctx := context.Background()
+				return daemonManager.RunMonitorWithTray(ctx)
 			}
 
 			// Check if daemon is already running (non-daemon mode)
@@ -137,6 +154,7 @@ func NewMonitorCmd(configLoader func() (*models.Config, error), devMode *bool) *
 
 	// Add flags
 	cmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run in daemon mode (background)")
+	cmd.Flags().BoolVarP(&trayMode, "tray", "t", false, "Run with system tray support")
 	cmd.Flags().BoolVar(&daemonInternal, "daemon-internal", false, "Internal flag for daemon process (do not use directly)")
 	cmd.Flags().MarkHidden("daemon-internal") // Hide from help
 

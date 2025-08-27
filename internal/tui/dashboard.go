@@ -1,7 +1,11 @@
 package tui
 
 import (
+	"bufio"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -9,24 +13,27 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/sr-tamim/guardian/internal/core"
+	"github.com/sr-tamim/guardian/internal/daemon"
 	"github.com/sr-tamim/guardian/pkg/version"
 )
 
 // Dashboard represents the main TUI interface
 type Dashboard struct {
-	provider       core.PlatformProvider
-	devMode        bool
-	serviceManager *ServiceManager
-	width          int
-	height         int
-	ready          bool
-	quitting       bool
+	provider   core.PlatformProvider
+	devMode    bool
+	pidManager *daemon.PIDManager
+	width      int
+	height     int
+	ready      bool
+	quitting   bool
 
 	// State
-	serviceRunning bool
-	blockedIPs     []string
-	attackCount    int64
-	lastUpdate     time.Time
+	daemonRunning bool
+	daemonPID     int
+	blockedIPs    []string
+	attackCount   int64
+	lastUpdate    time.Time
+	recentLogs    []string
 
 	// Navigation
 	selectedTab int
@@ -47,6 +54,8 @@ func NewDashboard() *Dashboard {
 	return &Dashboard{
 		tabs:       []string{"Dashboard", "Blocked IPs", "Logs", "Service", "Settings"},
 		lastUpdate: time.Now(),
+		pidManager: daemon.NewPIDManager(),
+		recentLogs: make([]string, 0),
 	}
 }
 
@@ -54,11 +63,6 @@ func NewDashboard() *Dashboard {
 func (d *Dashboard) SetProvider(provider core.PlatformProvider, devMode bool) {
 	d.provider = provider
 	d.devMode = devMode
-}
-
-// SetServiceManager links the dashboard with service manager
-func (d *Dashboard) SetServiceManager(sm *ServiceManager) {
-	d.serviceManager = sm
 }
 
 // Init initializes the dashboard
@@ -92,22 +96,10 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c":
-			// Minimize to tray instead of quit
+		case "ctrl+c", "q":
+			// Simply quit the dashboard
 			d.quitting = true
 			return d, tea.Quit
-
-		case "q":
-			// Quit but ask for confirmation if service is running
-			if d.serviceManager != nil && d.serviceManager.IsMonitoring() {
-				// In a real implementation, show confirmation dialog
-				// For now, minimize to tray to keep service running
-				d.quitting = true
-				return d, tea.Quit
-			} else {
-				d.quitting = true
-				return d, tea.Quit
-			}
 
 		case "tab", "right":
 			d.selectedTab = (d.selectedTab + 1) % len(d.tabs)
@@ -118,14 +110,16 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, nil
 
 		case "s":
-			// Toggle service through service manager if available
+			// Show daemon control options in service tab
 			if d.selectedTab == TabService {
-				if d.serviceManager != nil {
-					d.serviceManager.toggleMonitoring()
-					d.serviceRunning = d.serviceManager.IsMonitoring()
-				} else if d.provider != nil {
-					// Fallback to local toggle
-					d.serviceRunning = !d.serviceRunning
+				// For now, just refresh daemon status
+				// In the future, could show start/stop daemon options
+				if pid, running := d.pidManager.GetRunningPID(); running {
+					d.daemonRunning = true
+					d.daemonPID = pid
+				} else {
+					d.daemonRunning = false
+					d.daemonPID = 0
 				}
 				d.lastUpdate = time.Now()
 				return d, nil
@@ -144,6 +138,16 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case TickMsg:
 		d.lastUpdate = msg.Time
+		// Update daemon status
+		if pid, running := d.pidManager.GetRunningPID(); running {
+			d.daemonRunning = true
+			d.daemonPID = pid
+		} else {
+			d.daemonRunning = false
+			d.daemonPID = 0
+		}
+		// Update recent logs
+		d.updateRecentLogs()
 		return d, d.tickCmd()
 	}
 
@@ -157,7 +161,7 @@ func (d *Dashboard) View() string {
 	}
 
 	if d.quitting {
-		return "👋 Minimizing to system tray...\n🛡️  Guardian continues protecting in background\n\n💡 Right-click tray icon to restore or exit"
+		return "👋 Guardian Dashboard closed\n� Daemon status monitoring ended\n\n💡 Use 'guardian status' for quick status checks"
 	}
 
 	// Header
@@ -204,7 +208,7 @@ func (d *Dashboard) renderHeader() string {
 		Width(d.width)
 
 	versionInfo := version.Get()
-	title := fmt.Sprintf("🛡️  Guardian v%s - Interactive Dashboard", versionInfo.Version)
+	title := fmt.Sprintf("🛡️  Guardian v%s - Daemon Status Viewer", versionInfo.Version)
 
 	return titleStyle.Render(title)
 }
@@ -243,7 +247,7 @@ func (d *Dashboard) renderDashboardTab() string {
 
 	statusIcon := "🔴"
 	statusText := "STOPPED"
-	if d.serviceRunning {
+	if d.daemonRunning {
 		statusIcon = "🟢"
 		statusText = "RUNNING"
 	}
@@ -274,16 +278,17 @@ func (d *Dashboard) renderDashboardTab() string {
    • Platform Firewall: %s
    • Real-time Detection: %s
 
-Press 'r' to refresh, 'tab' to navigate, 'q' to minimize to tray
+	content += "
+Press 'r' to refresh, 'tab' to navigate"
 	`,
 		statusIcon, statusText, modeText,
 		d.attackCount,
 		len(d.blockedIPs),
 		d.lastUpdate.Format("15:04:05"),
 		platformInfo,
-		d.getServiceIcon(d.serviceRunning),
-		d.getServiceIcon(d.serviceRunning),
-		d.getServiceIcon(d.serviceRunning),
+		d.getServiceIcon(d.daemonRunning),
+		d.getServiceIcon(d.daemonRunning),
+		d.getServiceIcon(d.daemonRunning),
 	)
 
 	return contentStyle.Render(strings.TrimSpace(content))
@@ -314,16 +319,28 @@ func (d *Dashboard) renderBlockedTab() string {
 	return contentStyle.Render(content)
 }
 
-// renderLogsTab shows recent log activity
+// renderLogsTab shows recent log activity from daemon logs
 func (d *Dashboard) renderLogsTab() string {
 	contentStyle := lipgloss.NewStyle().
 		Padding(2).
 		Height(d.height - 6)
 
-	content := "📝 Recent Activity:\n\n"
-	content += "   [15:30:22] Failed RDP from 192.168.1.100\n"
-	content += "   [15:30:15] Blocked IP 203.0.113.50\n"
-	content += "   [15:29:45] Guardian service started\n"
+	content := "📝 Recent Daemon Activity:\n\n"
+
+	if len(d.recentLogs) == 0 {
+		if d.daemonRunning {
+			content += "   Loading daemon logs...\n"
+		} else {
+			content += "   No daemon running. Start with: guardian monitor -d\n"
+		}
+	} else {
+		for _, logLine := range d.recentLogs {
+			if logLine != "" {
+				content += fmt.Sprintf("   %s\n", logLine)
+			}
+		}
+	}
+
 	content += "\nPress 'r' to refresh, 'tab' to navigate"
 
 	return contentStyle.Render(content)
@@ -337,12 +354,12 @@ func (d *Dashboard) renderServiceTab() string {
 
 	statusIcon := "🔴"
 	statusText := "STOPPED"
-	actionText := "Press 's' to START service"
+	actionText := "Daemon not running - use 'guardian monitor -d' to start"
 
-	if d.serviceRunning {
+	if d.daemonRunning {
 		statusIcon = "🟢"
-		statusText = "RUNNING"
-		actionText = "Press 's' to STOP service"
+		statusText = fmt.Sprintf("RUNNING (PID: %d)", d.daemonPID)
+		actionText = "Use 'guardian stop' to stop daemon"
 	}
 
 	content := fmt.Sprintf(`
@@ -357,7 +374,7 @@ Background Mode: %s
 Press 'r' to refresh, 'tab' to navigate
 	`,
 		statusIcon, statusText,
-		d.getServiceIcon(d.serviceRunning),
+		d.getServiceIcon(d.daemonRunning),
 		actionText,
 	)
 
@@ -396,7 +413,7 @@ func (d *Dashboard) renderFooter() string {
 		Padding(0, 2).
 		Width(d.width)
 
-	controls := "Tab: Navigate • R: Refresh • S: Toggle Service • Q: Minimize to Tray • Ctrl+C: Minimize"
+	controls := "Tab: Navigate • R: Refresh • Q: Quit • Ctrl+C: Quit • TUI is Daemon Status Viewer"
 	return footerStyle.Render(controls)
 }
 
@@ -406,4 +423,55 @@ func (d *Dashboard) getServiceIcon(running bool) string {
 		return "✅"
 	}
 	return "❌"
+}
+
+// updateRecentLogs reads recent log entries from daemon log file
+func (d *Dashboard) updateRecentLogs() {
+	// Get log file path based on platform
+	var logPath string
+	switch runtime.GOOS {
+	case "windows":
+		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+			logPath = filepath.Join(localAppData, "Guardian", "logs", "guardian-daemon.log")
+		}
+	case "darwin":
+		if home := os.Getenv("HOME"); home != "" {
+			logPath = filepath.Join(home, "Library", "Logs", "Guardian", "guardian-daemon.log")
+		}
+	default: // linux
+		logPath = "/var/log/guardian/guardian-daemon.log"
+		if _, err := os.Stat(logPath); os.IsNotExist(err) {
+			if home := os.Getenv("HOME"); home != "" {
+				logPath = filepath.Join(home, ".local", "share", "Guardian", "logs", "guardian-daemon.log")
+			}
+		}
+	}
+
+	if logPath == "" {
+		d.recentLogs = []string{"Log path not available"}
+		return
+	}
+
+	// Read last few lines from log file
+	if file, err := os.Open(logPath); err == nil {
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		var lines []string
+
+		// Read all lines
+		for scanner.Scan() {
+			lines = append(lines, scanner.Text())
+		}
+
+		// Keep only last 10 lines
+		start := len(lines) - 10
+		if start < 0 {
+			start = 0
+		}
+
+		d.recentLogs = lines[start:]
+	} else {
+		d.recentLogs = []string{"Unable to read daemon logs: " + err.Error()}
+	}
 }

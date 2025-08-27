@@ -34,6 +34,16 @@ func NewManager(config *models.Config, provider core.PlatformProvider, devMode b
 
 // StartDaemon starts Guardian in daemon mode
 func (dm *Manager) StartDaemon() error {
+	return dm.StartDaemonWithOptions(false)
+}
+
+// StartDaemonWithTray starts Guardian in daemon mode with system tray support
+func (dm *Manager) StartDaemonWithTray() error {
+	return dm.StartDaemonWithOptions(true)
+}
+
+// StartDaemonWithOptions starts Guardian daemon with configurable tray support
+func (dm *Manager) StartDaemonWithOptions(withTray bool) error {
 	// Check if already running
 	if pid, running := dm.pidManager.GetRunningPID(); running {
 		return fmt.Errorf("Guardian daemon is already running (PID: %d)", pid)
@@ -49,6 +59,9 @@ func (dm *Manager) StartDaemon() error {
 	args := []string{"monitor", "--daemon-internal"}
 	if dm.devMode {
 		args = append(args, "--dev")
+	}
+	if withTray {
+		args = append(args, "--tray")
 	}
 
 	// Create log directory
@@ -67,9 +80,14 @@ func (dm *Manager) StartDaemon() error {
 
 	// On Windows, properly detach the process
 	if runtime.GOOS == "windows" {
-		// Create new process group and detach
+		// For system tray support, we need to allow window creation
+		// For headless daemon, we can hide the window
+		creationFlags := uint32(syscall.CREATE_NEW_PROCESS_GROUP)
+		if !withTray {
+			creationFlags |= 0x08000000 // CREATE_NO_WINDOW - only if no tray support
+		}
 		cmd.SysProcAttr = &syscall.SysProcAttr{
-			CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | 0x08000000, // CREATE_NO_WINDOW
+			CreationFlags: creationFlags,
 		}
 	}
 
@@ -215,6 +233,16 @@ func (dm *Manager) IsRunning() bool {
 // RunMonitorInCurrentProcess runs the monitoring in the current process
 // This is used when monitor is called in daemon mode
 func (dm *Manager) RunMonitorInCurrentProcess(ctx context.Context) error {
+	return dm.RunMonitorWithOptions(ctx, false)
+}
+
+// RunMonitorWithTray runs the monitoring with system tray support
+func (dm *Manager) RunMonitorWithTray(ctx context.Context) error {
+	return dm.RunMonitorWithOptions(ctx, true)
+}
+
+// RunMonitorWithOptions runs monitoring with configurable system tray support
+func (dm *Manager) RunMonitorWithOptions(ctx context.Context, withTray bool) error {
 	// Write PID file for current process
 	if err := dm.pidManager.WritePID(); err != nil {
 		return fmt.Errorf("failed to write PID file: %w", err)
@@ -225,6 +253,10 @@ func (dm *Manager) RunMonitorInCurrentProcess(ctx context.Context) error {
 
 	fmt.Printf("🛡️  Guardian daemon monitoring started (PID: %d)\n", os.Getpid())
 	fmt.Printf("📄 PID file: %s\n", dm.pidManager.GetPIDFilePath())
+
+	// Create context for monitoring that can be cancelled
+	monitorCtx, monitorCancel := context.WithCancel(ctx)
+	defer monitorCancel()
 
 	// Start monitoring for enabled services
 	for _, service := range dm.config.Services {
@@ -238,7 +270,7 @@ func (dm *Manager) RunMonitorInCurrentProcess(ctx context.Context) error {
 			for _, logPath := range logPaths {
 				go func(path, serviceName string) {
 					// Start log monitoring
-					if err := dm.provider.StartLogMonitoring(ctx, path, nil); err != nil {
+					if err := dm.provider.StartLogMonitoring(monitorCtx, path, nil); err != nil {
 						fmt.Printf("❌ Failed to start monitoring %s: %v\n", path, err)
 					}
 				}(logPath, service.Name)
@@ -246,8 +278,27 @@ func (dm *Manager) RunMonitorInCurrentProcess(ctx context.Context) error {
 		}
 	}
 
+	// If tray support is enabled, start the system tray
+	if withTray {
+		fmt.Println("🖼️  Starting system tray interface...")
+
+		// Create shutdown callback
+		shutdownCallback := func() {
+			fmt.Println("🛑 Shutdown requested from system tray")
+			monitorCancel() // Cancel monitoring context
+		}
+
+		// Create and start tray manager
+		trayManager := NewTrayManager(dm.provider, dm.devMode, shutdownCallback)
+
+		// Start tray in goroutine so it doesn't block monitoring
+		go func() {
+			trayManager.StartTray()
+		}()
+	}
+
 	// Wait for context cancellation (graceful shutdown)
-	<-ctx.Done()
+	<-monitorCtx.Done()
 	fmt.Println("🛑 Guardian daemon monitoring stopped")
 
 	return nil
