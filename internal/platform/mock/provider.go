@@ -234,20 +234,6 @@ func (m *MockProvider) StartLogMonitoring(ctx context.Context, logPath string, e
 	return nil
 }
 
-// Service management methods (not implemented in mock)
-func (m *MockProvider) InstallService() error   { return nil }
-func (m *MockProvider) UninstallService() error { return nil }
-func (m *MockProvider) StartService() error     { return nil }
-func (m *MockProvider) StopService() error      { return nil }
-
-func (m *MockProvider) ServiceStatus() (core.ServiceStatus, error) {
-	return core.ServiceStatus{
-		Running:   m.isRunning,
-		PID:       0, // Mock PID
-		StartTime: m.startTime,
-	}, nil
-}
-
 // Helper functions
 func formatExpiry(expiresAt *time.Time) string {
 	if expiresAt == nil {

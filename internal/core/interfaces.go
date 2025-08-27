@@ -23,13 +23,6 @@ type PlatformProvider interface {
 	// Log monitoring
 	GetLogPaths(service string) ([]string, error)
 	StartLogMonitoring(ctx context.Context, logPath string, events chan<- LogEvent) error
-
-	// Service management
-	InstallService() error
-	UninstallService() error
-	StartService() error
-	StopService() error
-	ServiceStatus() (ServiceStatus, error)
 }
 
 // LogMonitor handles real-time log file monitoring
@@ -99,14 +92,6 @@ type ThreatAssessment struct {
 	ShouldBlock       bool
 	Reason            string
 	RecommendedAction string
-}
-
-// ServiceStatus represents the status of Guardian service
-type ServiceStatus struct {
-	Running   bool
-	PID       int
-	StartTime time.Time
-	Error     error
 }
 
 // Application represents the main Guardian application

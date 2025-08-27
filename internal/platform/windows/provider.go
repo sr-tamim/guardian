@@ -391,32 +391,3 @@ func (w *WindowsProvider) cleanupExpiredRules() {
 		logger.LogCleanupOperation(w.config, removedCount, len(w.blockedIPs))
 	}
 }
-
-// Service management methods (Windows Service integration)
-func (w *WindowsProvider) InstallService() error {
-	// TODO: Implement Windows Service installation
-	return fmt.Errorf("Windows Service installation not implemented yet")
-}
-
-func (w *WindowsProvider) UninstallService() error {
-	// TODO: Implement Windows Service removal
-	return fmt.Errorf("Windows Service removal not implemented yet")
-}
-
-func (w *WindowsProvider) StartService() error {
-	// TODO: Implement Windows Service start
-	return fmt.Errorf("Windows Service start not implemented yet")
-}
-
-func (w *WindowsProvider) StopService() error {
-	// TODO: Implement Windows Service stop
-	return fmt.Errorf("Windows Service stop not implemented yet")
-}
-
-func (w *WindowsProvider) ServiceStatus() (core.ServiceStatus, error) {
-	return core.ServiceStatus{
-		Running:   w.isRunning,
-		PID:       0, // TODO: Get actual PID
-		StartTime: w.startTime,
-	}, nil
-}
