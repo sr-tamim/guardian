@@ -34,6 +34,14 @@
 - **Keyboard shortcuts** for efficient management
 - **Beautiful styling** with Lip Gloss framework
 
+### 🔄 **Daemon Mode (v0.0.3)**
+- **Background daemon** with `guardian monitor -d` (detaches and runs in background)
+- **Process management** - PID file tracking and process detection
+- **Daemon control** - `guardian stop` for clean termination
+- **Status monitoring** - `guardian status` shows daemon state and statistics
+- **Log file management** - Daemon logs to platform-specific directories
+- **Cross-platform** - Windows and Unix daemon support
+
 ### 🔧 **Enterprise Features**
 - **Service management** (systemd, Windows Service, launchd)
 - **Configuration management** with YAML configs
@@ -86,12 +94,44 @@
 Guardian now features a beautiful interactive terminal interface for desktop-friendly monitoring and management.
 
 ### **Quick Start**
+
+#### **Interactive TUI Mode**
 ```bash
 # Launch TUI in development mode
 ./guardian --dev tui
 
 # Launch TUI in production mode  
 ./guardian tui
+
+# Default behavior (no command) - launches TUI
+./guardian
+```
+
+#### **Daemon Mode (Background Service)**
+```bash
+# Start daemon in development mode (background)
+./guardian monitor -d --dev
+
+# Check daemon status  
+./guardian status --dev
+
+# Stop daemon
+./guardian stop --dev
+
+# Regular monitoring (foreground)
+./guardian monitor --dev
+```
+
+#### **Production Usage**
+```bash
+# Start production daemon
+sudo guardian monitor -d
+
+# Check status
+guardian status
+
+# Stop daemon
+guardian stop
 ```
 
 ### **TUI Navigation**

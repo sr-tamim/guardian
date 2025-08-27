@@ -8,7 +8,7 @@ rm -rf bin/
 mkdir -p bin/
 
 # Get version information
-VERSION="0.0.2"
+VERSION="0.0.3"
 if git rev-parse --git-dir > /dev/null 2>&1; then
     GIT_COMMIT=$(git rev-parse --short HEAD)
     if [ -n "$(git status --porcelain)" ]; then

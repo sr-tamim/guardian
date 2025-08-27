@@ -1,5 +1,46 @@
 # Guardian Version History
 
+## Version 0.0.3 (2025-01-XX) - Daemon Mode & Code Refactoring
+
+### 🚀 **Major Architecture & Daemon Implementation**
+
+#### ✨ **New Features - Daemon Mode**
+- **True Background Daemon** - `guardian monitor -d` runs in background and returns immediately
+- **Windows-Compatible Daemonization** - Proper process detachment using Windows APIs  
+- **Daemon Process Management** - PID file management with cross-platform support
+- **Daemon Detection** - Running `monitor` detects existing daemon and shows status instead of duplicate
+- **Stop Command** - `guardian stop` cleanly terminates daemon processes
+- **Status Integration** - Daemon status displayed in `guardian status` command
+- **Log File Management** - Daemon logs to `%LOCALAPPDATA%\Guardian\logs\` on Windows
+- **Internal Flag System** - `--daemon-internal` flag for spawned daemon processes
+
+#### 🏗️ **Code Architecture Refactoring** 
+- **Modular Command Structure** - Split 389-line main.go into organized command files
+- **Command Package** - New `cmd/guardian/commands/` package with separate files:
+  - `monitor.go` (144 lines) - Monitor & daemon functionality
+  - `stop.go` (39 lines) - Daemon stop command  
+  - `status.go` (31 lines) - Status information
+  - `version.go` (33 lines) - Version details
+  - `tui.go` (44 lines) - Terminal UI launcher
+  - `root.go` (25 lines) - Root command definition
+- **Sleek Main Entry Point** - Reduced main.go from 389 to 145 lines (63% reduction)
+- **Lazy Configuration Loading** - Configuration loaded only when needed with caching
+- **Clean Function Separation** - Single responsibility principle throughout
+
+#### 🔧 **Technical Enhancements**
+- **Cross-Platform Process Management** - Windows uses `tasklist`/`taskkill`, Unix uses signals
+- **Process Group Creation** - Windows `CREATE_NEW_PROCESS_GROUP` for proper detachment  
+- **File Handle Management** - Proper stdout/stderr redirection to log files
+- **PID File System** - Robust PID management with stale file cleanup
+- **Background Process Verification** - Daemon startup verification and health checks
+- **Graceful Shutdown** - Signal handling for clean daemon termination
+
+#### 🛠️ **Platform Compatibility**
+- **Windows Daemon Support** - Full Windows backgrounding with `CREATE_NO_WINDOW`
+- **Windows Process Detection** - `tasklist` integration for reliable process checking
+- **Cross-Platform Log Paths** - Platform-specific log directory resolution
+- **Windows-Compatible Termination** - `taskkill` for reliable process cleanup
+
 ## Version 0.0.2 (2025-01-XX) - Interactive TUI Dashboard
 
 ### 🎉 **Major Feature Release - Interactive Terminal Interface**

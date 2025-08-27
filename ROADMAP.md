@@ -1,7 +1,20 @@
 # Guardian Development Roadmap
 
-## 🎯 **Current Status: v0.0.1**
-✅ **Windows-First Implementation Complete**
+## 🎯 **Current Status: v0.0.3**
+✅ **Architecture Refactoring & Daemon Mode Complete**
+- Modular command structure with separated files (63% main.go reduction)
+- True background daemon mode with Windows support
+- PID management and daemon process control
+- Cross-platform daemon implementation
+- Professional code organization and maintainability
+
+✅ **Interactive TUI Dashboard Complete (v0.0.2)**
+- Interactive TUI dashboard with Bubble Tea framework
+- Real-time service management and monitoring
+- Beautiful terminal styling and keyboard navigation
+- Cross-platform GUI-friendly operation
+
+✅ **Windows-First Implementation Complete (v0.0.1)**
 - Windows RDP monitoring with PowerShell script parity
 - Windows Firewall integration
 - Cross-platform architecture foundation
@@ -12,31 +25,31 @@
 
 ## 🗺️ **Upcoming Releases**
 
-### **📋 Step 5: v0.0.2 - Interactive TUI Mode**
+### **� Step 7: v0.0.4 - System Service Integration**
 **Target: Next Release**
 
-#### **Core TUI Features**
-- **Double-click launcher** - GUI-friendly executable behavior
-- **Interactive dashboard** - Real-time attack visualization  
-- **Service management** - Start/stop background service via UI
-- **Background operation** - Service runs independently of TUI window
-- **Status monitoring** - Live blocked IPs, attack counts, service status
+#### **Service Management**
+- **Windows Service** - Install/uninstall as Windows Service
+- **Systemd integration** - Linux service management
+- **Auto-start capability** - Launch at system boot  
+- **Service status integration** - Show service state in TUI/CLI
+- **Service logs** - Integration with system logging
+
+#### **Enhanced Process Management**
+- **Service lifecycle** - Install, start, stop, uninstall commands
+- **Process monitoring** - Health checks and automatic restart
+- **Resource management** - Memory and CPU monitoring
+- **Signal handling** - Graceful shutdown and restart
 
 #### **Desktop Integration**
-- **Windows Service mode** - Install/uninstall Windows Service
 - **System tray integration** - Minimize to tray, show notifications
-- **Auto-start capability** - Launch at system boot
-- **Emergency controls** - Quick stop/unblock features
-
-#### **Technical Implementation**
-- **Bubble Tea TUI framework** - Modern terminal UI
-- **Service communication** - IPC between TUI and background service
-- **State persistence** - Remember service state across restarts
-- **Process management** - Proper service lifecycle handling
+- **Emergency controls** - Quick stop/unblock features via tray
+- **Desktop notifications** - Attack alerts and status updates
 
 ---
 
-### **🐧 Step 6: v0.0.3 - Linux Platform Support**
+### **🐧 Step 8: v0.0.5 - Linux Platform Support**
+### **🐧 Step 8: v0.0.5 - Linux Platform Support**
 **Target: Follow-up Release**
 
 #### **Linux-Specific Features**

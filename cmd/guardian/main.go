@@ -1,16 +1,14 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/sr-tamim/guardian/internal/platform"
+
+	"github.com/sr-tamim/guardian/cmd/guardian/commands"
 	"github.com/sr-tamim/guardian/internal/tui"
 	"github.com/sr-tamim/guardian/pkg/models"
 	"github.com/sr-tamim/guardian/pkg/version"
@@ -23,298 +21,126 @@ var (
 )
 
 func main() {
-	// Check if no arguments provided (double-click scenario)
+	// Handle no-args scenario (double-click)
 	if len(os.Args) == 1 {
-		// Default behavior: launch TUI directly
-		if err := launchTUIDirectly(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error launching Guardian: %v\n", err)
+		fmt.Println("🛡️  Guardian - No command specified, launching TUI...")
+		if err := launchTUI(); err != nil {
+			fmt.Printf("❌ Failed to launch TUI: %v\n", err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	// Normal CLI execution with commands
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	// Execute CLI commands
+	if err := newRootCommand().Execute(); err != nil {
+		fmt.Printf("❌ Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-var rootCmd = &cobra.Command{
-	Use:   "guardian",
-	Short: "Guardian - Modern Cross-Platform Intrusion Prevention System",
-	Long: `Guardian is a modern, cross-platform intrusion prevention system that monitors 
-log files and automatically blocks malicious IP addresses. Built as a contemporary 
-alternative to fail2ban with a beautiful terminal interface and intelligent threat detection.`,
-	Version: version.GetVersion(),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Default behavior when no subcommand is provided (e.g., double-click)
-		// This automatically launches the TUI interface
-		return tuiCmd.RunE(cmd, args)
-	},
-}
+// newRootCommand creates the root command with all subcommands
+func newRootCommand() *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:     "guardian",
+		Short:   "Guardian - Modern Cross-Platform Intrusion Prevention System",
+		Long:    `Guardian is a modern, cross-platform intrusion prevention system that monitors log files and automatically blocks malicious IP addresses. Built as a contemporary alternative to fail2ban with a beautiful terminal interface and intelligent threat detection.`,
+		Version: version.GetVersion(),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Default to TUI when no subcommand
+			return launchTUI()
+		},
+	}
 
-var monitorCmd = &cobra.Command{
-	Use:   "monitor",
-	Short: "Start monitoring logs for intrusion attempts",
-	Long:  "Start the Guardian monitoring daemon to watch log files for intrusion attempts and automatically block malicious IPs.",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load configuration
-		if err := loadConfig(); err != nil {
-			return fmt.Errorf("failed to load configuration: %w", err)
-		}
-
-		fmt.Printf("🛡️  Guardian v%s starting...\n", version.GetVersion())
-		fmt.Printf("⚙️  Development mode: %v\n", devMode)
-		fmt.Printf("📊 Monitoring %d services...\n", len(config.Services))
-
-		// Show enabled services
-		for _, service := range config.Services {
-			if service.Enabled {
-				fmt.Printf("   📝 %s: %s\n", service.Name, service.LogPath)
-			}
-		}
-
-		fmt.Printf("🚫 Failure threshold: %d attempts\n", config.Blocking.FailureThreshold)
-		fmt.Printf("⏰ Block duration: %v\n", config.Blocking.BlockDuration)
-
-		if devMode {
-			fmt.Println("🧪 Running in development mode - no real blocking will occur")
-			fmt.Println("📝 Using mock data and simulation for testing")
-		}
-
-		// Create platform provider
-		factory := platform.NewFactory()
-		provider, err := factory.CreateProvider(devMode, config)
-		if err != nil {
-			return fmt.Errorf("failed to create platform provider: %w", err)
-		}
-
-		fmt.Printf("🖥️  Platform: %s\n", provider.Name())
-		fmt.Println("✅ Guardian is ready! (Press Ctrl+C to stop)")
-
-		// Set up context for graceful shutdown
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		// Handle shutdown signals
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-		// Start monitoring for enabled services
-		for _, service := range config.Services {
-			if service.Enabled {
-				logPaths, err := provider.GetLogPaths(service.Name)
-				if err != nil {
-					fmt.Printf("❌ Failed to get log paths for %s: %v\n", service.Name, err)
-					continue
-				}
-
-				for _, logPath := range logPaths {
-					go func(path, serviceName string) {
-						// Start log monitoring (this will spawn background goroutines)
-						if err := provider.StartLogMonitoring(ctx, path, nil); err != nil {
-							fmt.Printf("❌ Failed to start monitoring %s: %v\n", path, err)
-						}
-					}(logPath, service.Name)
-				}
-			}
-		}
-
-		// Wait for shutdown signal
-		select {
-		case <-sigChan:
-			fmt.Println("\n🛑 Received shutdown signal...")
-		case <-ctx.Done():
-			fmt.Println("\n🛑 Context cancelled...")
-		}
-
-		cancel()
-		fmt.Println("👋 Guardian stopped gracefully")
-		return nil
-	},
-}
-
-var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show Guardian status and statistics",
-	Long:  "Display current Guardian status, active blocks, and monitoring statistics.",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		versionInfo := version.Get()
-		fmt.Printf("🛡️  Guardian Status v%s\n", versionInfo.Version)
-		fmt.Println("════════════════════════════════")
-		fmt.Printf("📅 Build Time: %s\n", version.GetBuildTime())
-		fmt.Printf("🔧 Git Commit: %s\n", version.GetShortCommit())
-		fmt.Printf("🐹 Go Version: %s\n", versionInfo.GoVersion)
-		fmt.Printf("🖥️  Platform: %s/%s\n", versionInfo.Platform, versionInfo.Arch)
-		fmt.Printf("⚙️  Development Mode: %v\n", devMode)
-		fmt.Println("📊 Status: Not implemented yet")
-		fmt.Println("🚫 Active Blocks: 0")
-		fmt.Println("👀 Monitoring: Not active")
-		return nil
-	},
-}
-
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Show detailed version information",
-	Long:  "Display detailed version information including build time and git commit.",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		versionInfo := version.Get()
-		fmt.Println(versionInfo.String())
-		fmt.Printf("\n📦 Build Details:\n")
-		fmt.Printf("   Version: %s\n", versionInfo.Version)
-		fmt.Printf("   Git Commit: %s\n", versionInfo.GitCommit)
-		fmt.Printf("   Build Time: %s\n", version.GetBuildTime())
-		fmt.Printf("   Go Version: %s\n", versionInfo.GoVersion)
-		fmt.Printf("   Platform: %s/%s\n", versionInfo.Platform, versionInfo.Arch)
-		if version.IsDevelopment() {
-			fmt.Printf("   Build Type: Development\n")
-		} else {
-			fmt.Printf("   Build Type: Release\n")
-		}
-		return nil
-	},
-}
-
-var tuiCmd = &cobra.Command{
-	Use:   "tui",
-	Short: "Launch interactive TUI dashboard with system tray support",
-	Long:  "Launch the Guardian interactive terminal user interface with background monitoring and system tray integration. Minimizes to tray when closed to keep protection active.",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load configuration first
-		if err := loadConfig(); err != nil {
-			return fmt.Errorf("failed to load configuration: %w", err)
-		}
-
-		// Create platform provider
-		factory := platform.NewFactory()
-		provider, err := factory.CreateProvider(devMode, config)
-		if err != nil {
-			return fmt.Errorf("failed to create platform provider: %w", err)
-		}
-
-		// Create service manager with TUI and tray support
-		serviceManager := tui.NewServiceManager(provider, devMode)
-
-		fmt.Printf("🛡️  Guardian v%s with TUI & System Tray\n", version.GetVersion())
-		fmt.Printf("⚙️  Development mode: %v\n", devMode)
-		fmt.Printf("🖥️  Platform: %s\n", provider.Name())
-		fmt.Println("✨ Starting with system tray integration...")
-
-		return serviceManager.StartWithTraySupport()
-	},
-}
-
-func init() {
 	// Global flags
 	rootCmd.PersistentFlags().BoolVar(&devMode, "dev", false, "Enable development mode")
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Configuration file path")
 
 	// Add subcommands
-	rootCmd.AddCommand(monitorCmd)
-	rootCmd.AddCommand(statusCmd)
-	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(tuiCmd)
+	rootCmd.AddCommand(commands.NewMonitorCmd(getConfig, &devMode))
+	rootCmd.AddCommand(commands.NewStopCmd(getConfig, &devMode))
+	rootCmd.AddCommand(commands.NewStatusCmd(&devMode))
+	rootCmd.AddCommand(commands.NewVersionCmd())
+	rootCmd.AddCommand(commands.NewTUICmd(getConfig, &devMode))
+
+	return rootCmd
 }
 
-// loadConfig loads configuration from file or uses defaults
-func loadConfig() error {
-	// If config file is specified, use it
-	if configFile != "" {
-		viper.SetConfigFile(configFile)
-		if err := viper.ReadInConfig(); err != nil {
-			return fmt.Errorf("error reading specified config file: %w", err)
-		}
-	} else if !devMode {
-		// In production mode, look for config in standard locations
-		viper.SetConfigName("guardian")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath("./configs")
-		viper.AddConfigPath("$HOME/.config/guardian")
-		viper.AddConfigPath("/etc/guardian")
-
-		if err := viper.ReadInConfig(); err != nil {
-			return fmt.Errorf("error reading config file: %w", err)
-		}
-	} else {
-		// In dev mode without explicit config, look for development config
-		viper.SetConfigName("development")
-		viper.SetConfigType("yaml")
-		viper.AddConfigPath("./configs")
-		viper.AddConfigPath("$HOME/.config/guardian")
-		viper.AddConfigPath("/etc/guardian")
-
-		// If development config found, use it; otherwise fall back to defaults
-		if err := viper.ReadInConfig(); err != nil {
-			// Fallback to platform-aware defaults
-			config = models.DefaultConfig()
-			return nil
-		}
+// getConfig loads and returns configuration (lazy loading with caching)
+func getConfig() (*models.Config, error) {
+	if config != nil {
+		return config, nil
 	}
 
-	// Start with platform-aware defaults, then overlay with config file values
-	if devMode {
-		config = models.DefaultConfig()
-	} else {
-		config = models.ProductionConfig()
+	if err := loadConfig(); err != nil {
+		return nil, err
 	}
-
-	// Unmarshal config file values on top of defaults (this merges intelligently)
-	if err := viper.Unmarshal(config); err != nil {
-		return fmt.Errorf("error unmarshaling config: %w", err)
-	}
-
-	return nil
+	return config, nil
 }
 
-// launchTUIDirectly starts the TUI interface directly (for double-click scenario)
-func launchTUIDirectly() error {
-	// Load configuration first
+// launchTUI starts the terminal user interface
+func launchTUI() error {
 	if err := loadConfig(); err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Create platform provider
-	factory := platform.NewFactory()
-	provider, err := factory.CreateProvider(devMode, config)
-	if err != nil {
-		return fmt.Errorf("failed to create platform provider: %w", err)
-	}
-
-	// Create service manager with TUI and tray support
-	serviceManager := tui.NewServiceManager(provider, devMode)
-
-	fmt.Printf("🛡️  Guardian v%s with TUI & System Tray\n", version.GetVersion())
-	fmt.Printf("⚙️  Development mode: %v\n", devMode)
-	fmt.Printf("🖥️  Platform: %s\n", provider.Name())
-	fmt.Println("✨ Starting with system tray integration...")
-
-	return serviceManager.StartWithTraySupport()
-}
-
-// createTUIDashboard creates a new TUI dashboard instance
-func createTUIDashboard() *tui.Dashboard {
-	factory := platform.NewFactory()
-	provider, err := factory.CreateProvider(devMode, config)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating platform provider: %v\n", err)
-		os.Exit(1)
-	}
-
-	dashboard := tui.NewDashboard()
-	dashboard.SetProvider(provider, devMode)
-	return dashboard
-}
-
-// startTUI initializes and runs the TUI dashboard
-func startTUI(dashboard *tui.Dashboard) error {
-	p := tea.NewProgram(
-		dashboard,
+	program := tea.NewProgram(
+		tui.NewDashboard(),
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
 
-	_, err := p.Run()
+	_, err := program.Run()
 	return err
+}
+
+// loadConfig loads configuration from file or sets defaults
+func loadConfig() error {
+	if config != nil {
+		return nil // Already loaded
+	}
+
+	// Set sensible defaults
+	viper.SetDefault("blocking.failure_threshold", 3)
+	viper.SetDefault("blocking.block_duration", "2m")
+	viper.SetDefault("blocking.cleanup_interval", "1m")
+
+	// Configure config file paths
+	if configFile != "" {
+		viper.SetConfigFile(configFile)
+	} else {
+		viper.SetConfigName("guardian")
+		viper.SetConfigType("yaml")
+		viper.AddConfigPath("./configs/")
+		viper.AddConfigPath(".")
+
+		// Platform-specific paths
+		if userConfigDir, err := os.UserConfigDir(); err == nil {
+			viper.AddConfigPath(userConfigDir + "/Guardian")
+		}
+	}
+
+	// Load config file (non-fatal if missing)
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Printf("⚠️  Could not read config file: %v\n", err)
+		fmt.Println("📝 Using default configuration...")
+	}
+
+	// Unmarshal into struct
+	config = &models.Config{}
+	if err := viper.Unmarshal(config); err != nil {
+		return fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	// Ensure default services exist
+	if len(config.Services) == 0 {
+		config.Services = []models.ServiceConfig{
+			{
+				Name:    "SSH",
+				LogPath: "C:\\ProgramData\\ssh\\logs\\sshd.log",
+				Enabled: true,
+			},
+		}
+	}
+
+	return nil
 }
