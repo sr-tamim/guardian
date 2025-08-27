@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/sr-tamim/guardian/internal/autostart"
 	"github.com/sr-tamim/guardian/internal/daemon"
 	"github.com/sr-tamim/guardian/pkg/version"
 )
@@ -32,6 +33,19 @@ func NewStatusCmd(devMode *bool) *cobra.Command {
 			} else {
 				fmt.Println("📊 Status: ⏹️  Stopped")
 				fmt.Println("👀 Monitoring: ❌ Not active")
+			}
+
+			// Check autostart status
+			execPath, err := autostart.GetExecutablePath()
+			if err == nil {
+				autoStart := autostart.New("Guardian", execPath)
+				if autoStart.IsEnabled() {
+					fmt.Println("🚀 Auto-startup: ✅ Enabled")
+				} else {
+					fmt.Println("🚀 Auto-startup: ❌ Disabled")
+				}
+			} else {
+				fmt.Println("🚀 Auto-startup: ❓ Unknown")
 			}
 
 			fmt.Println("🚫 Active Blocks: 0")

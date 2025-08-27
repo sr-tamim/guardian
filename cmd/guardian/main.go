@@ -61,6 +61,7 @@ func newRootCommand() *cobra.Command {
 	rootCmd.AddCommand(commands.NewStatusCmd(&devMode))
 	rootCmd.AddCommand(commands.NewVersionCmd())
 	rootCmd.AddCommand(commands.NewTUICmd(getConfig, &devMode))
+	rootCmd.AddCommand(commands.NewAutostartCmd(getConfig, &devMode))
 
 	return rootCmd
 }

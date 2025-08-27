@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/sr-tamim/guardian/internal/autostart"
 	"github.com/sr-tamim/guardian/internal/core"
 	"github.com/sr-tamim/guardian/internal/daemon"
 	"github.com/sr-tamim/guardian/pkg/version"
@@ -28,12 +29,13 @@ type Dashboard struct {
 	quitting   bool
 
 	// State
-	daemonRunning bool
-	daemonPID     int
-	blockedIPs    []string
-	attackCount   int64
-	lastUpdate    time.Time
-	recentLogs    []string
+	daemonRunning    bool
+	daemonPID        int
+	autostartEnabled bool
+	blockedIPs       []string
+	attackCount      int64
+	lastUpdate       time.Time
+	recentLogs       []string
 
 	// Navigation
 	selectedTab int
@@ -121,6 +123,7 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					d.daemonRunning = false
 					d.daemonPID = 0
 				}
+				d.updateAutostartStatus()
 				d.lastUpdate = time.Now()
 				return d, nil
 			}
@@ -146,6 +149,8 @@ func (d *Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.daemonRunning = false
 			d.daemonPID = 0
 		}
+		// Update autostart status
+		d.updateAutostartStatus()
 		// Update recent logs
 		d.updateRecentLogs()
 		return d, d.tickCmd()
@@ -277,6 +282,7 @@ func (d *Dashboard) renderDashboardTab() string {
    • Platform Monitoring: %s
    • Platform Firewall: %s
    • Real-time Detection: %s
+   • Auto-startup: %s
 
 	content += "
 Press 'r' to refresh, 'tab' to navigate"
@@ -289,6 +295,7 @@ Press 'r' to refresh, 'tab' to navigate"
 		d.getServiceIcon(d.daemonRunning),
 		d.getServiceIcon(d.daemonRunning),
 		d.getServiceIcon(d.daemonRunning),
+		d.getAutostartIcon(),
 	)
 
 	return contentStyle.Render(strings.TrimSpace(content))
@@ -362,6 +369,13 @@ func (d *Dashboard) renderServiceTab() string {
 		actionText = "Use 'guardian stop' to stop daemon"
 	}
 
+	autostartIcon := "🔴"
+	autostartText := "DISABLED"
+	if d.autostartEnabled {
+		autostartIcon = "🟢"
+		autostartText = "ENABLED"
+	}
+
 	content := fmt.Sprintf(`
 🔧 Service Management
 
@@ -369,12 +383,14 @@ Current Status: %s %s
 
 System Service: Not installed
 Background Mode: %s
+Auto-startup: %s %s
 
 %s
 Press 'r' to refresh, 'tab' to navigate
 	`,
 		statusIcon, statusText,
 		d.getServiceIcon(d.daemonRunning),
+		autostartIcon, autostartText,
 		actionText,
 	)
 
@@ -425,6 +441,14 @@ func (d *Dashboard) getServiceIcon(running bool) string {
 	return "❌"
 }
 
+// getAutostartIcon returns appropriate icon for autostart status
+func (d *Dashboard) getAutostartIcon() string {
+	if d.autostartEnabled {
+		return "✅ Enabled"
+	}
+	return "❌ Disabled"
+}
+
 // updateRecentLogs reads recent log entries from daemon log file
 func (d *Dashboard) updateRecentLogs() {
 	// Get log file path based on platform
@@ -473,5 +497,15 @@ func (d *Dashboard) updateRecentLogs() {
 		d.recentLogs = lines[start:]
 	} else {
 		d.recentLogs = []string{"Unable to read daemon logs: " + err.Error()}
+	}
+}
+
+// updateAutostartStatus checks and updates the autostart status
+func (d *Dashboard) updateAutostartStatus() {
+	if execPath, err := autostart.GetExecutablePath(); err == nil {
+		autoStart := autostart.New("Guardian", execPath)
+		d.autostartEnabled = autoStart.IsEnabled()
+	} else {
+		d.autostartEnabled = false
 	}
 }
