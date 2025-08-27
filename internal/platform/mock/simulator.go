@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sr-tamim/guardian/internal/core"
+	"github.com/sr-tamim/guardian/pkg/logger"
 	"github.com/sr-tamim/guardian/pkg/models"
 )
 
@@ -61,6 +62,9 @@ func (m *MockProvider) simulateWindowsSecurityEvents(ctx context.Context, events
 				m.totalAttacks++
 				m.mu.Unlock()
 				fmt.Printf("🚨 [MOCK] Generated Windows Security Event: Failed RDP logon from %s (user: %s)\n", ip, username)
+
+				// Use structured logging for attack attempts if configured
+				logger.LogAttackAttempt(m.config, ip, "RDP", username, "medium")
 			default:
 				// Channel is full, skip
 			}
@@ -165,6 +169,9 @@ func (m *MockProvider) cleanupExpiredBlocks() {
 
 	if removedCount > 0 {
 		fmt.Printf("✅ [MOCK] Cleanup completed: removed %d expired rules\n", removedCount)
+
+		// Use structured logging for cleanup events if configured
+		logger.LogCleanupOperation(m.config, removedCount, len(m.firewallRules))
 	}
 }
 

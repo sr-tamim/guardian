@@ -57,11 +57,17 @@ func (b *BlockingConfig) GenerateRuleName(ip, service string) string {
 
 // LoggingConfig holds logging configuration
 type LoggingConfig struct {
-	Level      string `yaml:"level" json:"level"`
-	Format     string `yaml:"format" json:"format"`
-	Output     string `yaml:"output" json:"output"`
-	EnableFile bool   `yaml:"enable_file" json:"enable_file"`
-	FilePath   string `yaml:"file_path" json:"file_path"`
+	Level               string `yaml:"level" json:"level"`
+	Format              string `yaml:"format" json:"format"`
+	Output              string `yaml:"output" json:"output"`
+	EnableFile          bool   `yaml:"enable_file" json:"enable_file"`
+	FilePath            string `yaml:"file_path" json:"file_path"`
+	EnableContextual    bool   `yaml:"enable_contextual" json:"enable_contextual"`
+	LogEventLookups     bool   `yaml:"log_event_lookups" json:"log_event_lookups"`
+	LogFirewallActions  bool   `yaml:"log_firewall_actions" json:"log_firewall_actions"`
+	LogAttackAttempts   bool   `yaml:"log_attack_attempts" json:"log_attack_attempts"`
+	LogMonitoringEvents bool   `yaml:"log_monitoring_events" json:"log_monitoring_events"`
+	LogCleanupEvents    bool   `yaml:"log_cleanup_events" json:"log_cleanup_events"`
 }
 
 // StorageConfig holds database configuration
@@ -110,11 +116,17 @@ func DefaultConfig() *Config {
 			RuleNameTemplate: "Guardian - {timestamp} - {ip}", // Default template
 		},
 		Logging: LoggingConfig{
-			Level:      "debug",
-			Format:     "text",
-			Output:     "stdout",
-			EnableFile: false,
-			FilePath:   logPath, // Platform-aware path
+			Level:               "debug",
+			Format:              "text",
+			Output:              "stdout",
+			EnableFile:          false,
+			FilePath:            logPath, // Platform-aware path
+			EnableContextual:    true,
+			LogEventLookups:     true,
+			LogFirewallActions:  true,
+			LogAttackAttempts:   true,
+			LogMonitoringEvents: true,
+			LogCleanupEvents:    true,
 		},
 		Storage: StorageConfig{
 			Type:     "memory",
@@ -156,11 +168,17 @@ func ProductionConfig() *Config {
 			RuleNameTemplate: "Guardian - {timestamp} - {ip}", // Default template
 		},
 		Logging: LoggingConfig{
-			Level:      "info",
-			Format:     "text",
-			Output:     "stdout",
-			EnableFile: false,
-			FilePath:   paths.GetDefaultGuardianLogPath(), // Platform-aware path
+			Level:               "info",
+			Format:              "text",
+			Output:              "stdout",
+			EnableFile:          true,
+			FilePath:            paths.GetDefaultGuardianLogPath(), // Platform-aware path
+			EnableContextual:    true,
+			LogEventLookups:     false, // Too verbose for production
+			LogFirewallActions:  true,
+			LogAttackAttempts:   true,
+			LogMonitoringEvents: false, // Too verbose for production
+			LogCleanupEvents:    true,
 		},
 		Storage: StorageConfig{
 			Type:     "sqlite",

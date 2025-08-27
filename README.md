@@ -77,9 +77,16 @@
 - **Service management** (systemd, Windows Service, launchd)
 - **Configuration management** with YAML configs
 - **Persistent storage** with SQLite backend
-- **Logging integration** (syslog, Event Log, file)
+- **Structured logging** with configurable verbosity and context
 - **Statistics tracking** and reporting
 - **Notification system** (email, webhooks, desktop)
+
+### 📋 **Enhanced Logging**
+- **Structured logging** with JSON/text formats and configurable levels
+- **Event-specific logging** for attacks, firewall actions, and monitoring events
+- **Contextual information** with function, file, and module details
+- **File and stdout output** with platform-aware paths
+- **Configurable verbosity** from debug to production-ready levels
 
 ### 🌍 **Cross-Platform Support**
 - **Linux**: iptables + systemd + inotify monitoring
@@ -264,6 +271,32 @@ sudo guardian monitor
 sudo make install
 sudo systemctl enable guardian
 ```
+
+---
+
+## ⚙️ Configuration
+
+### **Logging Configuration**
+Guardian features structured logging with configurable verbosity:
+
+```yaml
+logging:
+  level: "info"                 # debug, info, warn, error
+  format: "text"                # text or json
+  enable_file: true
+  file_path: "/var/log/guardian/guardian.log"
+  
+  # Event-specific logging flags
+  log_event_lookups: true       # Log IP discovery details
+  log_firewall_actions: true    # Log IP blocking/unblocking
+  log_attack_attempts: true     # Log detected intrusions
+  log_monitoring_events: false  # Log service lifecycle (verbose)
+  log_cleanup_events: true      # Log rule cleanup operations
+```
+
+**Log Output Examples:**
+- `INFO IP address blocked ip=192.168.1.100 rule_name="Guardian-20250827-192.168.1.100" duration=20h`
+- `WARN Attack attempt detected ip=10.0.0.5 service=SSH username=root severity=high`
 
 ---
 

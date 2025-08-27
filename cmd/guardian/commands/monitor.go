@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/sr-tamim/guardian/internal/daemon"
 	"github.com/sr-tamim/guardian/internal/platform"
+	"github.com/sr-tamim/guardian/pkg/logger"
 	"github.com/sr-tamim/guardian/pkg/models"
 	"github.com/sr-tamim/guardian/pkg/version"
 )
@@ -124,14 +125,24 @@ func NewMonitorCmd(configLoader func() (*models.Config, error), devMode *bool) *
 					logPaths, err := provider.GetLogPaths(service.Name)
 					if err != nil {
 						fmt.Printf("❌ Failed to get log paths for %s: %v\n", service.Name, err)
+						logger.Error("Failed to get log paths",
+							"service", service.Name,
+							"error", err)
 						continue
 					}
+
+					// Log event lookup using elegant function
+					logger.LogEventLookup(config, service.Name, "various", 0, []string{}) // Will be updated with actual counts later
 
 					for _, logPath := range logPaths {
 						go func(path, serviceName string) {
 							// Start log monitoring (this will spawn background goroutines)
 							if err := provider.StartLogMonitoring(ctx, path, nil); err != nil {
 								fmt.Printf("❌ Failed to start monitoring %s: %v\n", path, err)
+								logger.Error("Failed to start monitoring",
+									"path", path,
+									"service", serviceName,
+									"error", err)
 							}
 						}(logPath, service.Name)
 					}

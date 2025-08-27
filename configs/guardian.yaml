@@ -19,9 +19,16 @@ logging:
   level: "info"
   format: "text"
   output: "stdout"
-  enable_file: false
+  enable_file: true
   # Platform-aware path will be used if commented out
-  # file_path: "C:\\ProgramData\\Guardian\\logs\\guardian.log"
+  file_path: "C:\\ProgramData\\Guardian\\logs\\guardian.log"
+  # Enhanced logging configuration for robust behavior
+  enable_contextual: true       # Include function, file, module context
+  log_event_lookups: true       # Log every event lookup with IP counts
+  log_firewall_actions: true    # Log when IPs are blocked/unblocked with rule details
+  log_attack_attempts: true     # Log detected attack attempts with details
+  log_monitoring_events: true   # Log monitoring start/stop events
+  log_cleanup_events: true      # Log cleanup operations with counts
 
 storage:
   type: "sqlite"

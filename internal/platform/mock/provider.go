@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/sr-tamim/guardian/internal/core"
+	"github.com/sr-tamim/guardian/pkg/logger"
 	"github.com/sr-tamim/guardian/pkg/models"
 )
 
@@ -124,6 +125,10 @@ func (m *MockProvider) BlockIP(ip string, duration time.Duration, reason string)
 
 	fmt.Printf("🚫 [MOCK] Blocked IP %s with rule: %s (expires: %v)\n",
 		ip, ruleName, formatExpiry(expiresAt))
+
+	// Use structured logging for firewall action if configured
+	logger.LogIPBlocked(m.config, ip, reason, ruleName, duration)
+
 	return nil
 }
 
@@ -153,7 +158,13 @@ func (m *MockProvider) UnblockIP(ip string) error {
 	now := time.Now()
 	blockRecord.UnblockedAt = &now
 
+	activeTime := now.Sub(blockRecord.BlockedAt)
+
 	fmt.Printf("✅ [MOCK] Unblocked IP %s (removed rule: %s)\n", ip, ruleToRemove)
+
+	// Use structured logging for firewall action if configured
+	logger.LogIPUnblocked(m.config, ip, ruleToRemove, activeTime)
+
 	return nil
 }
 
@@ -213,6 +224,9 @@ func (m *MockProvider) StartLogMonitoring(ctx context.Context, logPath string, e
 	m.mu.Unlock()
 
 	fmt.Printf("📊 [MOCK] Started monitoring %s (simulating Windows Security Event Log)\n", logPath)
+
+	// Use structured logging for monitoring events if configured
+	logger.LogMonitoringStart(m.config, "MOCK", logPath, "MockProvider")
 
 	go m.simulateWindowsSecurityEvents(ctx, events)
 	go m.startCleanupScheduler(ctx)

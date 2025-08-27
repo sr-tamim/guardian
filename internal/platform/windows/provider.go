@@ -14,6 +14,7 @@ import (
 
 	"github.com/sr-tamim/guardian/internal/core"
 	"github.com/sr-tamim/guardian/internal/parser"
+	"github.com/sr-tamim/guardian/pkg/logger"
 	"github.com/sr-tamim/guardian/pkg/models"
 )
 
@@ -135,7 +136,11 @@ func (w *WindowsProvider) BlockIP(ip string, duration time.Duration, reason stri
 	w.blockedIPs[ip] = blockRecord
 	w.totalBlocks++
 
+	// Keep the console output for immediate feedback
 	fmt.Printf("🚫 [WIN] Blocked IP %s with Windows Firewall rule: %s\n", ip, ruleName)
+
+	// Use structured logging for firewall action if configured
+	logger.LogIPBlocked(w.config, ip, reason, ruleName, duration)
 
 	return nil
 }
@@ -167,8 +172,14 @@ func (w *WindowsProvider) UnblockIP(ip string) error {
 	blockRecord.IsActive = false
 	now := time.Now()
 	blockRecord.UnblockedAt = &now
+	activeTime := now.Sub(blockRecord.BlockedAt)
 
+	// Keep the console output for immediate feedback
 	fmt.Printf("✅ [WIN] Unblocked IP %s (removed Windows Firewall rule: %s)\n", ip, ruleName)
+
+	// Use structured logging for firewall action if configured
+	logger.LogIPUnblocked(w.config, ip, ruleName, activeTime)
+
 	return nil
 }
 
@@ -225,7 +236,11 @@ func (w *WindowsProvider) StartLogMonitoring(ctx context.Context, logPath string
 	w.isRunning = true
 	w.mu.Unlock()
 
+	// Keep the console output for immediate feedback
 	fmt.Printf("📊 [WIN] Started monitoring Windows %s Event Log for RDP failures\n", logPath)
+
+	// Use structured logging for monitoring events if configured
+	logger.LogMonitoringStart(w.config, "RDP", logPath, "WindowsProvider")
 
 	// Start the event monitoring goroutine
 	go w.monitorWindowsEventLog(ctx, events)
@@ -270,7 +285,11 @@ func (w *WindowsProvider) queryRecentEvents(since time.Time, events chan<- core.
 
 	output, err := cmd.Output()
 	if err != nil {
+		// Keep the console output for immediate feedback
 		fmt.Printf("⚠️  [WIN] Error querying Windows Event Log: %v\n", err)
+
+		// Log error using structured logging
+		logger.Error("Failed to query Windows Event Log", "error", err)
 		return
 	}
 
@@ -315,7 +334,11 @@ func (w *WindowsProvider) startCleanupScheduler(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
+	// Keep the console output for immediate feedback
 	fmt.Println("🧹 [WIN] Started Windows Firewall cleanup scheduler (runs every 5 minutes)")
+
+	// Log using structured logging
+	logger.Info("Started Windows Firewall cleanup scheduler", "interval", "5 minutes")
 
 	for {
 		select {
@@ -353,6 +376,7 @@ func (w *WindowsProvider) cleanupExpiredRules() {
 					removedCount++
 
 					elapsed := currentTime.Sub(record.BlockedAt)
+					// Keep the console output for immediate feedback
 					fmt.Printf("🧹 [WIN] Removed expired Windows Firewall rule for %s (was active for %v)\n",
 						ip, elapsed.Truncate(time.Second))
 				}
@@ -362,6 +386,9 @@ func (w *WindowsProvider) cleanupExpiredRules() {
 
 	if removedCount > 0 {
 		fmt.Printf("✅ [WIN] Cleanup completed: removed %d expired Windows Firewall rules\n", removedCount)
+
+		// Use structured logging for cleanup events if configured
+		logger.LogCleanupOperation(w.config, removedCount, len(w.blockedIPs))
 	}
 }
 

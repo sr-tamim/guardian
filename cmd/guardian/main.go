@@ -10,6 +10,7 @@ import (
 
 	"github.com/sr-tamim/guardian/cmd/guardian/commands"
 	"github.com/sr-tamim/guardian/internal/tui"
+	"github.com/sr-tamim/guardian/pkg/logger"
 	"github.com/sr-tamim/guardian/pkg/models"
 	"github.com/sr-tamim/guardian/pkg/version"
 )
@@ -23,6 +24,7 @@ var (
 func main() {
 	// Handle no-args scenario (double-click)
 	if len(os.Args) == 1 {
+		// Use fmt.Println for TUI launch message since logger isn't initialized yet
 		fmt.Println("🛡️  Guardian - No command specified, launching TUI...")
 		if err := launchTUI(); err != nil {
 			fmt.Printf("❌ Failed to launch TUI: %v\n", err)
@@ -122,6 +124,7 @@ func loadConfig() error {
 
 	// Load config file (non-fatal if missing)
 	if err := viper.ReadInConfig(); err != nil {
+		// Use fmt.Printf before logger is initialized
 		fmt.Printf("⚠️  Could not read config file: %v\n", err)
 		fmt.Println("📝 Using default configuration...")
 	}
@@ -130,6 +133,19 @@ func loadConfig() error {
 	config = &models.Config{}
 	if err := viper.Unmarshal(config); err != nil {
 		return fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	// Initialize logger with configuration
+	if err := logger.InitializeLogger(&config.Logging); err != nil {
+		// Fallback to fmt.Printf if logger initialization fails
+		fmt.Printf("⚠️  Failed to initialize logger: %v\n", err)
+		// Continue with default logging via fmt.Printf
+	} else {
+		logger.Info("Guardian configuration loaded successfully",
+			"config_file", viper.ConfigFileUsed(),
+			"log_level", config.Logging.Level,
+			"log_format", config.Logging.Format,
+		)
 	}
 
 	// Ensure default services exist
