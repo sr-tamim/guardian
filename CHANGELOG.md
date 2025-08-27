@@ -1,6 +1,6 @@
 # Guardian Version History
 
-## Version 0.0.3 (2025-01-XX) - Daemon Mode & Code Refactoring
+## Version 0.0.3 (2025-08-27) - Daemon Mode & Code Refactoring
 
 ### 🚀 **Major Architecture & Daemon Implementation**
 
@@ -41,7 +41,7 @@
 - **Cross-Platform Log Paths** - Platform-specific log directory resolution
 - **Windows-Compatible Termination** - `taskkill` for reliable process cleanup
 
-## Version 0.0.2 (2025-01-XX) - Interactive TUI Dashboard
+## Version 0.0.2 (2025-08-25) - Interactive TUI Dashboard
 
 ### 🎉 **Major Feature Release - Interactive Terminal Interface**
 
