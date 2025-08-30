@@ -32,6 +32,7 @@ type BlockingConfig struct {
 	MaxConcurrentBlocks int           `yaml:"max_concurrent_blocks" json:"max_concurrent_blocks"`
 	WhitelistedIPs      []string      `yaml:"whitelisted_ips" json:"whitelisted_ips"`
 	AutoUnblock         bool          `yaml:"auto_unblock" json:"auto_unblock"`
+	CleanupInterval     time.Duration `yaml:"cleanup_interval" json:"cleanup_interval"`
 	RuleNameTemplate    string        `yaml:"rule_name_template" json:"rule_name_template"`
 }
 
@@ -113,6 +114,7 @@ func DefaultConfig() *Config {
 				"10.0.0.0/8",
 			},
 			AutoUnblock:      true,
+			CleanupInterval:  30 * time.Second,                // Fast cleanup for development
 			RuleNameTemplate: "Guardian - {timestamp} - {ip}", // Default template
 		},
 		Logging: LoggingConfig{
@@ -165,6 +167,7 @@ func ProductionConfig() *Config {
 				"192.168.1.0/24",
 			},
 			AutoUnblock:      true,
+			CleanupInterval:  5 * time.Minute,                 // Production cleanup every 5 minutes
 			RuleNameTemplate: "Guardian - {timestamp} - {ip}", // Default template
 		},
 		Logging: LoggingConfig{

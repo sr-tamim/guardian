@@ -136,11 +136,13 @@ func (w *WindowsProvider) BlockIP(ip string, duration time.Duration, reason stri
 	w.blockedIPs[ip] = blockRecord
 	w.totalBlocks++
 
-	// Keep the console output for immediate feedback
-	fmt.Printf("🚫 [WIN] Blocked IP %s with Windows Firewall rule: %s\n", ip, ruleName)
-
-	// Use structured logging for firewall action if configured
+	// Use structured logging for firewall action
 	logger.LogIPBlocked(w.config, ip, reason, ruleName, duration)
+	logger.Info("IP blocked with Windows Firewall",
+		"ip", ip,
+		"rule", ruleName,
+		"reason", reason,
+		"duration", duration)
 
 	return nil
 }
@@ -174,11 +176,12 @@ func (w *WindowsProvider) UnblockIP(ip string) error {
 	blockRecord.UnblockedAt = &now
 	activeTime := now.Sub(blockRecord.BlockedAt)
 
-	// Keep the console output for immediate feedback
-	fmt.Printf("✅ [WIN] Unblocked IP %s (removed Windows Firewall rule: %s)\n", ip, ruleName)
-
-	// Use structured logging for firewall action if configured
+	// Use structured logging for firewall action
 	logger.LogIPUnblocked(w.config, ip, ruleName, activeTime)
+	logger.Info("IP unblocked from Windows Firewall",
+		"ip", ip,
+		"rule", ruleName,
+		"activeTime", activeTime)
 
 	return nil
 }
@@ -236,11 +239,11 @@ func (w *WindowsProvider) StartLogMonitoring(ctx context.Context, logPath string
 	w.isRunning = true
 	w.mu.Unlock()
 
-	// Keep the console output for immediate feedback
-	fmt.Printf("📊 [WIN] Started monitoring Windows %s Event Log for RDP failures\n", logPath)
-
-	// Use structured logging for monitoring events if configured
+	// Use structured logging for monitoring events
 	logger.LogMonitoringStart(w.config, "RDP", logPath, "WindowsProvider")
+	logger.Info("Started monitoring Windows Event Log for RDP failures",
+		"logPath", logPath,
+		"provider", "WindowsProvider")
 
 	// Start the event monitoring goroutine
 	go w.monitorWindowsEventLog(ctx, events)
@@ -254,20 +257,58 @@ func (w *WindowsProvider) StartLogMonitoring(ctx context.Context, logPath string
 // monitorWindowsEventLog monitors Windows Security Event Log for Event ID 4625
 // This is the Go equivalent of your PowerShell Get-WinEvent command
 func (w *WindowsProvider) monitorWindowsEventLog(ctx context.Context, events chan<- core.LogEvent) {
-	// Use wevtutil to query Windows Event Log (alternative to Get-WinEvent)
-	// Query for failed logon events (Event ID 4625) in real-time
-	ticker := time.NewTicker(10 * time.Second) // Check every 10 seconds
+	// Use configurable check interval from configuration
+	checkInterval := w.config.Monitoring.CheckInterval
+	if checkInterval <= 0 {
+		// Fallback to 10 seconds if not configured
+		checkInterval = 10 * time.Second
+		logger.Warn("CheckInterval not configured, using fallback", "fallback", "10s")
+	}
+
+	// Use configurable lookback duration with safety check
+	lookbackDuration := w.config.Monitoring.LookbackDuration
+	if lookbackDuration <= 0 {
+		// Fallback to 1 hour if not configured
+		lookbackDuration = 1 * time.Hour
+		logger.Warn("LookbackDuration not configured or zero, using fallback", "fallback", "1h")
+	}
+
+	ticker := time.NewTicker(checkInterval)
 	defer ticker.Stop()
 
-	var lastEventTime time.Time = time.Now().Add(-1 * time.Hour) // Look back 1 hour initially
+	var lastEventTime time.Time = time.Now().Add(-lookbackDuration)
+
+	// Log startup information
+	logger.Info("Windows Event Log monitoring started",
+		"checkInterval", checkInterval.String(),
+		"eventID", "4625",
+		"lookbackDuration", lookbackDuration.String(),
+		"initialLookback", lastEventTime.Format("2006-01-02 15:04:05"))
+
+	// Log configuration details for troubleshooting
+	logger.Info("Monitoring configuration details",
+		"configCheckInterval", w.config.Monitoring.CheckInterval.String(),
+		"configLookbackDuration", w.config.Monitoring.LookbackDuration.String(),
+		"configEnableRealTime", w.config.Monitoring.EnableRealTime)
 
 	for {
 		select {
 		case <-ctx.Done():
+			logger.Info("Windows Event Log monitoring stopped")
 			return
 		case <-ticker.C:
-			w.queryRecentEvents(lastEventTime, events)
-			lastEventTime = time.Now()
+			// Use sliding window approach - always look back the full configured duration
+			// This ensures we analyze attack patterns over the complete time window
+			currentTime := time.Now()
+			windowStart := currentTime.Add(-lookbackDuration)
+
+			logger.Info("Checking Windows Event Log with sliding window",
+				"windowStart", windowStart.Format("15:04:05"),
+				"windowEnd", currentTime.Format("15:04:05"),
+				"windowDuration", lookbackDuration.String(),
+				"timezone", currentTime.Location().String())
+
+			w.queryRecentEvents(windowStart, events)
 		}
 	}
 }
@@ -275,22 +316,63 @@ func (w *WindowsProvider) monitorWindowsEventLog(ctx context.Context, events cha
 // queryRecentEvents queries Windows Event Log for recent failed logon events
 // Equivalent to your PowerShell: Get-WinEvent -FilterHashtable @{LogName='Security'; ID=4625}
 func (w *WindowsProvider) queryRecentEvents(since time.Time, events chan<- core.LogEvent) {
-	// Use wevtutil to query events since the last check
-	sinceStr := since.Format("2006-01-02T15:04:05.000Z")
+	// Windows Event Log @SystemTime queries require UTC format with Z suffix
+	// This was confirmed by manual testing: UTC works, local time doesn't
+	sinceUTC := since.UTC().Format("2006-01-02T15:04:05.000Z")
+
+	// Keep local time for logging purposes
+	sinceLocal := since.Format("2006-01-02T15:04:05.000")
+
+	// Use UTC format (this is what @SystemTime expects)
+	sinceStr := sinceUTC
 
 	cmd := exec.Command("wevtutil", "qe", "Security",
 		"/q:*[System[EventID=4625 and TimeCreated[@SystemTime>='"+sinceStr+"']]]",
 		"/f:text",
 		"/c:50") // Limit to 50 events per query
 
+	logger.Info("Executing Windows Event Log query",
+		"command", "wevtutil qe Security",
+		"filter", fmt.Sprintf("EventID=4625 and TimeCreated>='%s'", sinceStr),
+		"limit", 50,
+		"localTimeQuery", sinceLocal,
+		"utcTimeQuery", sinceUTC,
+		"usingFormat", sinceStr)
+
 	output, err := cmd.Output()
 	if err != nil {
-		// Keep the console output for immediate feedback
-		fmt.Printf("⚠️  [WIN] Error querying Windows Event Log: %v\n", err)
+		// Log error with detailed information
+		logger.Error("Failed to query Windows Event Log",
+			"error", err,
+			"command", cmd.String(),
+			"sinceTime", sinceStr)
 
-		// Log error using structured logging
-		logger.Error("Failed to query Windows Event Log", "error", err)
+		// Try to get more detailed error info
+		if exitError, ok := err.(*exec.ExitError); ok {
+			logger.Error("Windows Event Log query stderr",
+				"stderr", string(exitError.Stderr),
+				"exitCode", exitError.ExitCode())
+		}
 		return
+	}
+
+	logger.Info("Event Log query completed",
+		"outputBytes", len(output),
+		"hasEvents", len(output) > 0,
+		"since", since.Format("15:04:05"))
+
+	if len(output) > 0 {
+		// Log sample of output for debugging (first 200 chars)
+		sampleOutput := string(output)
+		if len(sampleOutput) > 200 {
+			sampleOutput = sampleOutput[:200] + "..."
+		}
+		logger.Info("Event Log query found data",
+			"sampleOutput", sampleOutput,
+			"totalBytes", len(output))
+	} else {
+		logger.Info("No events found in specified time range",
+			"timeRange", fmt.Sprintf("since %s", since.Format("15:04:05")))
 	}
 
 	// Parse the output and send events
@@ -302,13 +384,34 @@ func (w *WindowsProvider) parseEventLogOutput(output string, events chan<- core.
 	// Split output into individual events
 	eventBlocks := strings.Split(output, "Event[")
 
-	for _, eventBlock := range eventBlocks {
+	logger.Info("Parsing Event Log output",
+		"totalBlocks", len(eventBlocks),
+		"outputLength", len(output))
+
+	parsedEvents := 0
+	for i, eventBlock := range eventBlocks {
 		if strings.TrimSpace(eventBlock) == "" {
 			continue
 		}
 
-		// Only process if this looks like an RDP event
-		if w.eventParser.IsRDPEvent(eventBlock) {
+		// Log each event block for debugging
+		logger.Info("Processing event block",
+			"blockNumber", i,
+			"blockLength", len(eventBlock),
+			"preview", func() string {
+				if len(eventBlock) > 200 {
+					return eventBlock[:200] + "..."
+				}
+				return eventBlock
+			}())
+
+		// Check if this looks like an RDP event
+		isRDP := w.eventParser.IsRDPEvent(eventBlock)
+		logger.Info("RDP event check result",
+			"blockNumber", i,
+			"isRDPEvent", isRDP)
+
+		if isRDP {
 			event := core.LogEvent{
 				Timestamp: time.Now(),
 				Source:    "Security",
@@ -321,30 +424,51 @@ func (w *WindowsProvider) parseEventLogOutput(output string, events chan<- core.
 				w.mu.Lock()
 				w.totalAttacks++
 				w.mu.Unlock()
+				parsedEvents++
+				logger.Info("RDP attack event detected and sent for processing",
+					"eventNumber", parsedEvents,
+					"totalAttacks", w.totalAttacks)
 			default:
-				// Channel is full, skip
+				logger.Warn("Event channel full, dropping RDP attack event")
 			}
 		}
+	}
+
+	if parsedEvents > 0 {
+		logger.Info("Parsed and processed RDP attack events",
+			"eventCount", parsedEvents,
+			"totalAttacks", w.totalAttacks)
+	} else if len(eventBlocks) > 1 {
+		logger.Info("Event blocks found but no RDP events detected",
+			"totalBlocks", len(eventBlocks),
+			"rdpEvents", 0)
 	}
 }
 
 // startCleanupScheduler runs periodic cleanup like your PowerShell script
 func (w *WindowsProvider) startCleanupScheduler(ctx context.Context) {
-	// Your PowerShell script runs cleanup every 5 minutes
-	ticker := time.NewTicker(5 * time.Minute)
+	// Use configurable cleanup interval from configuration
+	cleanupInterval := w.config.Blocking.CleanupInterval
+	if cleanupInterval <= 0 {
+		// Fallback to 5 minutes if not configured
+		cleanupInterval = 5 * time.Minute
+	}
+
+	ticker := time.NewTicker(cleanupInterval)
 	defer ticker.Stop()
 
-	// Keep the console output for immediate feedback
-	fmt.Println("🧹 [WIN] Started Windows Firewall cleanup scheduler (runs every 5 minutes)")
-
-	// Log using structured logging
-	logger.Info("Started Windows Firewall cleanup scheduler", "interval", "5 minutes")
+	// Log startup using structured logging
+	logger.Info("Started Windows Firewall cleanup scheduler",
+		"interval", cleanupInterval.String(),
+		"configurable", true)
 
 	for {
 		select {
 		case <-ctx.Done():
+			logger.Info("Windows Firewall cleanup scheduler stopped")
 			return
 		case <-w.stopCleanup:
+			logger.Info("Windows Firewall cleanup scheduler stopped by request")
 			return
 		case <-ticker.C:
 			w.cleanupExpiredRules()
@@ -360,6 +484,7 @@ func (w *WindowsProvider) cleanupExpiredRules() {
 
 	currentTime := time.Now()
 	removedCount := 0
+	var removedIPs []string
 
 	for ip, record := range w.blockedIPs {
 		if record.IsActive && record.ExpiresAt != nil {
@@ -374,20 +499,32 @@ func (w *WindowsProvider) cleanupExpiredRules() {
 					record.IsActive = false
 					record.UnblockedAt = &currentTime
 					removedCount++
+					removedIPs = append(removedIPs, ip)
 
 					elapsed := currentTime.Sub(record.BlockedAt)
-					// Keep the console output for immediate feedback
-					fmt.Printf("🧹 [WIN] Removed expired Windows Firewall rule for %s (was active for %v)\n",
-						ip, elapsed.Truncate(time.Second))
+					logger.Info("Removed expired Windows Firewall rule",
+						"ip", ip,
+						"rule", ruleName,
+						"activeTime", elapsed.Truncate(time.Second))
+				} else {
+					logger.Error("Failed to remove expired firewall rule",
+						"ip", ip,
+						"rule", ruleName,
+						"error", err)
 				}
 			}
 		}
 	}
 
 	if removedCount > 0 {
-		fmt.Printf("✅ [WIN] Cleanup completed: removed %d expired Windows Firewall rules\n", removedCount)
+		logger.Info("Cleanup operation completed",
+			"removedRules", removedCount,
+			"totalBlocked", len(w.blockedIPs),
+			"removedIPs", removedIPs)
 
-		// Use structured logging for cleanup events if configured
+		// Use structured logging for cleanup events
 		logger.LogCleanupOperation(w.config, removedCount, len(w.blockedIPs))
+	} else {
+		logger.Debug("Cleanup operation completed - no expired rules found")
 	}
 }
