@@ -73,16 +73,18 @@
 ## 📸 Screenshots
 
 ### Interactive TUI Dashboard
-*[Screenshot placeholder - TUI Dashboard showing live monitoring]*
+<img width="885" height="536" alt="image" src="https://github.com/user-attachments/assets/33e86b69-03c2-4579-a1f7-7c454762ef8e" />
 
-### Windows Event Log Monitoring  
-*[Screenshot placeholder - Real-time Windows Security Event Log monitoring]*
+### Enhanced Log Monitoring
+<img width="973" height="514" alt="image" src="https://github.com/user-attachments/assets/cd3d7bf1-4ad2-4050-bdfd-ef3afc8cec52" />
 
 ### Background Daemon Mode
-*[Screenshot placeholder - Daemon status and process management]*
+<img width="978" height="136" alt="image" src="https://github.com/user-attachments/assets/e8a9cf47-aeb8-467b-8f48-f5914efd3028" />
 
-### Firewall Rule Management
-*[Screenshot placeholder - Windows Firewall rules created by Guardian]*
+### Useful Commands
+<img width="494" height="273" alt="image" src="https://github.com/user-attachments/assets/fed48f8b-93ff-4077-b1db-1eb985d305d6" />
+<img width="972" height="563" alt="image" src="https://github.com/user-attachments/assets/9cdc3810-e48b-4c96-945f-393ea3d313bd" />
+
 
 ---
 
