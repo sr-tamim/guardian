@@ -2,7 +2,23 @@
 
 ## 🎯 **Current Status: v0.0.3**
 ✅ **Architecture Refactoring & Daemon Mode Complete**
-- Modular command structure with separated files (63% main.go reduction)
+
+## 📊 **Version Comparison Matrix**
+
+| Feature | v0.0.1-3 | v0.0.4 | v0.0.5 | v0.0.6 | v0.1.0 |
+|---------|----------|--------|--------|--------|--------|
+| **Windows Foundation** | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete |
+| **Windows Core Logic** | ❌ Missing | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete |
+| **Linux Support** | ❌ | ❌ | ✅ Service | ✅ Full | ✅ Full |
+| **Interactive UI** | ✅ TUI | ✅ TUI | ✅ TUI | ✅ TUI | ✅ Web + TUI |
+| **Background Service** | ✅ Windows | ✅ Windows | ✅ All | ✅ All | ✅ All |
+| **Attack Detection** | ❌ Missing | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete |
+| **Auto Blocking** | ❌ Missing | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete |
+| **ML Detection** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Multi-server** | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+✅ **Modular Command Structure Complete (v0.0.3)**
+- Improved command structure with separated files (63% main.go reduction)
 - True background daemon mode with Windows support
 - PID management and daemon process control
 - Cross-platform daemon implementation
@@ -14,18 +30,50 @@
 - Beautiful terminal styling and keyboard navigation
 - Cross-platform GUI-friendly operation
 
-✅ **Windows-First Implementation Complete (v0.0.1)**
-- Windows RDP monitoring with PowerShell script parity
-- Windows Firewall integration
-- Cross-platform architecture foundation
-- Proper versioning system
-- Server testing and deployment tools
+🔄 **Windows Platform Foundation Complete, Core Logic In Development (v0.0.1)**
+- ✅ Windows Event Log monitoring (Event ID 4625 detection)
+- ✅ Windows Firewall integration (`netsh advfirewall`)
+- ✅ Event parsing and IP extraction
+- ✅ Firewall rule creation/deletion
+- ✅ Cross-platform architecture foundation
+- ✅ Proper versioning system
+- ✅ Server testing and deployment tools
+- ❌ **Missing: Attack detection logic** (threshold counting per IP)
+- ❌ **Missing: Threat assessment system** (blocking decisions)
+- ❌ **Missing: Event processing pipeline** (monitoring → detection → blocking)
+- ❌ **Missing: Persistent storage** (SQLite integration)
 
 ---
 
 ## 🗺️ **Upcoming Releases**
 
-### **� Step 7: v0.0.4 - System Service Integration**
+### **🛡️ Priority: v0.0.4 - Windows Core Logic Completion**
+**Target: IMMEDIATE - Complete Windows Platform**
+
+#### **Critical Missing Components**
+- **Attack Detection Engine** - Implement IP-based threshold counting
+  ```go
+  type ThreatDetector struct {
+      attackCounts map[string]int
+      timeWindows  map[string]time.Time
+      threshold    int
+  }
+  ```
+- **Event Processing Pipeline** - Connect monitoring to blocking decisions
+- **Persistent Storage** - SQLite integration for attack/block records
+- **Threat Assessment** - IP whitelist checking and blocking logic
+- **Integration Layer** - Wire all components together in main monitoring loop
+
+#### **Implementation Priority**
+1. **Attack counting per IP** - Track failed attempts from Event Log
+2. **Threshold-based blocking** - Trigger BlockIP() when threshold exceeded  
+3. **Storage persistence** - Save attack attempts and block records
+4. **Whitelist checking** - Prevent blocking trusted IPs
+5. **Full end-to-end testing** - Real attack detection and blocking
+
+---
+
+### **🔧 Step 5: v0.0.5 - System Service Integration**
 **Target: Next Release**
 
 #### **Service Management**
@@ -48,9 +96,8 @@
 
 ---
 
-### **🐧 Step 8: v0.0.5 - Linux Platform Support**
-### **🐧 Step 8: v0.0.5 - Linux Platform Support**
-**Target: Follow-up Release**
+### **🐧 Step 6: v0.0.6 - Linux Platform Support**
+**Target: After Windows Completion**
 
 #### **Linux-Specific Features**
 - **iptables integration** - Native Linux firewall support
@@ -65,18 +112,7 @@
 
 ---
 
-### **🍎 Step 7: v0.0.4 - macOS Platform Support**
-**Target: Full Cross-Platform**
-
-#### **macOS-Specific Features**
-- **pfctl integration** - macOS firewall management
-- **launchd service** - Native macOS service system
-- **FSEvents monitoring** - macOS file system events
-- **Homebrew packaging** - Easy installation via brew
-
----
-
-### **🧠 Step 8: v0.1.0 - Advanced Intelligence**
+### **🧠 Step 7: v0.1.0 - Advanced Intelligence**
 **Target: Major Feature Release**
 
 #### **AI/ML Integration**
@@ -93,78 +129,49 @@
 
 ---
 
-## 🔥 **Step 5 Focus: TUI Implementation Plan**
+##  **Version Comparison Matrix**
 
-### **Priority 1: Double-Click Launcher**
-```go
-// Check if launched without arguments (double-click)
-if len(os.Args) == 1 {
-    // Launch interactive TUI mode
-    startTUI()
-} else {
-    // Normal CLI mode
-    rootCmd.Execute()
-}
-```
-
-### **Priority 2: Service Management**
-```
-Main Menu:
-┌─────────────────────────────────────┐
-│  🛡️  Guardian v0.0.2                 │
-│  ═══════════════════════════════════ │
-│                                     │
-│  Service Status: ●  Running         │
-│  Active Blocks:      3 IPs          │
-│  Last Activity:      2 min ago      │
-│                                     │
-│  [S] Start Service                  │
-│  [T] Stop Service                   │
-│  [V] View Blocked IPs               │
-│  [L] View Live Attacks              │
-│  [C] Configuration                  │
-│  [Q] Quit                           │
-└─────────────────────────────────────┘
-```
-
-### **Priority 3: Background Service**
-- **Windows Service** - Install as actual Windows Service
-- **Service communication** - Named pipes or TCP for IPC
-- **Persistent operation** - Continue running after TUI close
-- **Auto-recovery** - Restart on crash or system reboot
-
----
-
-## 📊 **Version Comparison Matrix**
-
-| Feature | v0.0.1 | v0.0.2 | v0.0.3 | v0.1.0 |
-|---------|--------|--------|--------|--------|
-| **Windows Support** | ✅ CLI | ✅ TUI | ✅ TUI | ✅ TUI |
-| **Linux Support** | ❌ | ❌ | ✅ Full | ✅ Full |
-| **macOS Support** | ❌ | ❌ | ❌ | ✅ Full |
-| **Interactive UI** | ❌ CLI Only | ✅ TUI | ✅ TUI | ✅ Web + TUI |
-| **Background Service** | ❌ | ✅ Windows | ✅ All | ✅ All |
-| **Double-click Launch** | ❌ | ✅ | ✅ | ✅ |
-| **ML Detection** | ❌ | ❌ | ❌ | ✅ |
-| **Multi-server** | ❌ | ❌ | ❌ | ✅ |
+| Feature | v0.0.1-3 | v0.0.4 | v0.0.5 | v0.0.6 | v0.1.0 |
+|---------|----------|--------|--------|--------|--------|
+| **Windows Foundation** | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete |
+| **Windows Core Logic** | ❌ Missing | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete |
+| **Linux Support** | ❌ | ❌ | ✅ Service | ✅ Full | ✅ Full |
+| **Interactive UI** | ✅ TUI | ✅ TUI | ✅ TUI | ✅ TUI | ✅ Web + TUI |
+| **Background Service** | ✅ Windows | ✅ Windows | ✅ All | ✅ All | ✅ All |
+| **Attack Detection** | ❌ Missing | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete |
+| **Auto Blocking** | ❌ Missing | ✅ Complete | ✅ Complete | ✅ Complete | ✅ Complete |
+| **ML Detection** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Multi-server** | ❌ | ❌ | ❌ | ❌ | ✅ |
 
 ---
 
 ## 🎯 **Success Metrics**
 
-### **v0.0.2 Success Criteria**
-- ✅ Double-click launches TUI (no command line needed)
-- ✅ Can start/stop service from TUI
-- ✅ TUI window can close while service runs
-- ✅ Re-opening shows current service status
-- ✅ Windows Service integration works
-- ✅ All v0.0.1 functionality preserved
+### **v0.0.3 Current Status**
+- ✅ Architecture refactoring complete (modular commands)
+- ✅ TUI dashboard functional and beautiful
+- ✅ Daemon mode working with PID management
+- ✅ Windows Event Log monitoring implemented
+- ✅ Windows Firewall integration implemented
+- ❌ **Missing: Attack detection logic** (no automatic blocking)
+- ❌ **Missing: Event processing pipeline** (events detected but not acted upon)
+- ❌ **Missing: Persistent storage** (all data lost on restart)
 
-### **Development Timeline**
-- **TUI Framework Setup**: 2-3 days
-- **Service Architecture**: 3-4 days  
-- **Windows Service Integration**: 2-3 days
-- **Testing & Polish**: 2-3 days
-- **Total Estimate**: 10-12 days
+### **v0.0.4 Success Criteria (Windows Completion)**
+- ✅ Attack counting per IP address
+- ✅ Threshold-based automatic blocking
+- ✅ Persistent storage of attacks and blocks
+- ✅ IP whitelist functionality
+- ✅ End-to-end attack detection and blocking
+- ✅ Can detect real RDP attacks and block automatically
+- ✅ Survives restarts with persistent data
 
-**Next: Step 5 - Interactive TUI Implementation** 🚀
+### **Development Timeline for v0.0.4**
+- **Attack Detection Engine**: 3-4 days
+- **Event Processing Pipeline**: 2-3 days  
+- **SQLite Storage Integration**: 2-3 days
+- **Whitelist & Configuration**: 1-2 days
+- **End-to-End Testing**: 2-3 days
+- **Total Estimate**: 10-15 days
+
+**Next Priority: Complete Windows Core Logic** �
