@@ -6,7 +6,7 @@
 
 **Guardian** is a modern, cross-platform intrusion prevention system that monitors log files and automatically blocks malicious IP addresses. Built as a contemporary alternative to fail2ban, it features an interactive terminal dashboard, intelligent threat detection, and seamless cross-platform deployment.
 
-**Current Status**: Guardian v0.0.3 with **Windows platform in active development**, featuring foundational Event Log monitoring, Windows Firewall integration, TUI dashboard, and background daemon mode. **Core attack detection logic still in development.**
+**Current Status**: Guardian v0.0.3 with **Windows platform in active development**, featuring foundational Event Log monitoring, Windows Firewall integration, TUI dashboard, background daemon mode, and system tray integration. **Core attack detection logic still in development.**
 
 ### 🔥 Key Value Propositions
 - **Solid Foundation** - Windows platform architecture and components in development
@@ -26,9 +26,9 @@
 - **Windows Firewall integration** via `netsh advfirewall` ✅ **Implemented** 
 - **Event parsing and IP extraction** ✅ **Implemented**
 - **Automatic rule cleanup** of expired firewall rules ✅ **Implemented**
-- ❌ **Attack detection logic** - Threshold counting and blocking decisions (In Development)
-- ❌ **Threat assessment** - IP analysis and whitelist checking (In Development)
-- ❌ **Event processing pipeline** - Connecting monitoring to blocking (In Development)
+- ✅ **Attack detection logic** - Threshold counting and blocking decisions (Windows)
+- ✅ **Threat assessment** - IP analysis and whitelist checking (Windows)
+- ✅ **Event processing pipeline** - Monitoring → detection → blocking (Windows)
 - ❌ **Persistent storage** - Attack and block record persistence (Planned)
 
 ### 🖥️ **Interactive Dashboard (v0.0.2 - Complete)**
@@ -153,6 +153,58 @@
 
 # Interactive testing with TUI
 ./guardian.exe --dev tui
+```
+
+### **Build the Windows EXE**
+
+```bash
+# Build directly
+go build -o bin/guardian.exe ./cmd/guardian
+
+# Or use the build script (adds version metadata)
+./scripts/build-server.sh
+```
+
+---
+
+## 🧰 Server Deployment Guide (Windows)
+
+Use this for initial Windows Server testing. Guardian can run as a background daemon and read a YAML config file.
+
+### 1) Prepare config
+
+Default config lookup order (no `--config` flag):
+- ./configs/guardian.yaml
+- ./guardian.yaml
+- %APPDATA%\Guardian\guardian.yaml
+
+Recommended: copy and edit [configs/guardian.yaml](configs/guardian.yaml) on the server.
+
+### 2) Run daemon
+
+```bash
+# Start daemon (background)
+./guardian.exe monitor -d --config "C:\path\to\guardian.yaml"
+
+# Start daemon with system tray (interactive desktop session)
+./guardian.exe monitor -d --tray --config "C:\path\to\guardian.yaml"
+
+# Development mode (no real blocking)
+./guardian.exe monitor -d --dev --config "C:\path\to\guardian.yaml"
+```
+
+### 3) Check status / stop
+
+```bash
+./guardian.exe status
+./guardian.exe stop
+```
+
+### 4) Optional: auto-start on boot
+
+```bash
+./guardian.exe autostart enable
+./guardian.exe autostart status
 ```
 
 ### **TUI Navigation**
