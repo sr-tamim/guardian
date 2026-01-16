@@ -14,7 +14,7 @@ blocking:
     - "192.168.1.0/24"
   auto_unblock: true
   cleanup_interval: "5m"  # Production cleanup every 5 minutes
-  rule_name_template: "Guardian - {timestamp} - {ip}"
+  rule_name_template: "Guardian - {ip} - {timestamp}"
 
 logging:
   level: "info"

@@ -308,14 +308,14 @@ func (w *WindowsProvider) monitorWindowsEventLog(ctx context.Context, events cha
 				"windowDuration", lookbackDuration.String(),
 				"timezone", currentTime.Location().String())
 
-			w.queryRecentEvents(windowStart, events)
+			w.queryRecentEvents(windowStart, lookbackDuration, events)
 		}
 	}
 }
 
 // queryRecentEvents queries Windows Event Log for recent failed logon events
 // Equivalent to your PowerShell: Get-WinEvent -FilterHashtable @{LogName='Security'; ID=4625}
-func (w *WindowsProvider) queryRecentEvents(since time.Time, events chan<- core.LogEvent) {
+func (w *WindowsProvider) queryRecentEvents(since time.Time, windowDuration time.Duration, events chan<- core.LogEvent) {
 	// Windows Event Log @SystemTime queries require UTC format with Z suffix
 	// This was confirmed by manual testing: UTC works, local time doesn't
 	sinceUTC := since.UTC().Format("2006-01-02T15:04:05.000Z")
@@ -376,11 +376,11 @@ func (w *WindowsProvider) queryRecentEvents(since time.Time, events chan<- core.
 	}
 
 	// Parse the output and send events
-	w.parseEventLogOutput(string(output), events)
+	w.parseEventLogOutput(string(output), windowDuration, events)
 }
 
 // parseEventLogOutput processes wevtutil output and creates LogEvent entries
-func (w *WindowsProvider) parseEventLogOutput(output string, events chan<- core.LogEvent) {
+func (w *WindowsProvider) parseEventLogOutput(output string, windowDuration time.Duration, events chan<- core.LogEvent) {
 	// Split output into individual events
 	eventBlocks := strings.Split(output, "Event[")
 
@@ -389,6 +389,9 @@ func (w *WindowsProvider) parseEventLogOutput(output string, events chan<- core.
 		"outputLength", len(output))
 
 	parsedEvents := 0
+	rdpEvents := 0
+	attackCounts := make(map[string]int)
+	uniqueIPs := make(map[string]struct{})
 	for i, eventBlock := range eventBlocks {
 		if strings.TrimSpace(eventBlock) == "" {
 			continue
@@ -412,6 +415,7 @@ func (w *WindowsProvider) parseEventLogOutput(output string, events chan<- core.
 			"isRDPEvent", isRDP)
 
 		if isRDP {
+			rdpEvents++
 			event := core.LogEvent{
 				Timestamp: time.Now(),
 				Source:    "Security",
@@ -419,17 +423,58 @@ func (w *WindowsProvider) parseEventLogOutput(output string, events chan<- core.
 				Service:   "RDP",
 			}
 
-			select {
-			case events <- event:
-				w.mu.Lock()
-				w.totalAttacks++
-				w.mu.Unlock()
-				parsedEvents++
-				logger.Info("RDP attack event detected and sent for processing",
-					"eventNumber", parsedEvents,
-					"totalAttacks", w.totalAttacks)
-			default:
-				logger.Warn("Event channel full, dropping RDP attack event")
+			if events != nil {
+				select {
+				case events <- event:
+					w.mu.Lock()
+					w.totalAttacks++
+					w.mu.Unlock()
+					parsedEvents++
+					logger.Info("RDP attack event detected and sent for processing",
+						"eventNumber", parsedEvents,
+						"totalAttacks", w.totalAttacks)
+				default:
+					logger.Warn("Event channel full, dropping RDP attack event")
+				}
+			} else {
+				attempt, err := w.eventParser.ParseLine(eventBlock)
+				if err != nil {
+					continue
+				}
+
+				attackCounts[attempt.IP]++
+				uniqueIPs[attempt.IP] = struct{}{}
+
+				logger.LogAttackAttempt(w.config, attempt.IP, attempt.Service, attempt.Username, attempt.Severity.String())
+			}
+		}
+	}
+
+	if events == nil {
+		ips := make([]string, 0, len(uniqueIPs))
+		for ip := range uniqueIPs {
+			ips = append(ips, ip)
+		}
+
+		logger.LogEventLookup(w.config, "RDP", "Security", rdpEvents, ips)
+
+		threshold := w.config.Blocking.FailureThreshold
+		if threshold <= 0 {
+			threshold = 1
+		}
+
+		for ip, count := range attackCounts {
+			if count < threshold {
+				continue
+			}
+			if w.isWhitelistedIP(ip) {
+				logger.Info("Skipping whitelisted IP", "ip", ip)
+				continue
+			}
+
+			reason := fmt.Sprintf("Failed logon threshold exceeded: %d attempts in %s", count, windowDuration.Truncate(time.Second))
+			if err := w.BlockIP(ip, w.config.Blocking.BlockDuration, reason); err != nil {
+				logger.Warn("Failed to block IP after threshold exceeded", "ip", ip, "error", err)
 			}
 		}
 	}
@@ -438,11 +483,37 @@ func (w *WindowsProvider) parseEventLogOutput(output string, events chan<- core.
 		logger.Info("Parsed and processed RDP attack events",
 			"eventCount", parsedEvents,
 			"totalAttacks", w.totalAttacks)
-	} else if len(eventBlocks) > 1 {
+	} else if rdpEvents == 0 && len(eventBlocks) > 1 {
 		logger.Info("Event blocks found but no RDP events detected",
 			"totalBlocks", len(eventBlocks),
 			"rdpEvents", 0)
 	}
+}
+
+func (w *WindowsProvider) isWhitelistedIP(ip string) bool {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return false
+	}
+
+	for _, entry := range w.config.Blocking.WhitelistedIPs {
+		candidate := strings.TrimSpace(entry)
+		if candidate == "" {
+			continue
+		}
+		if strings.Contains(candidate, "/") {
+			_, network, err := net.ParseCIDR(candidate)
+			if err == nil && network.Contains(parsed) {
+				return true
+			}
+			continue
+		}
+		if candidate == ip {
+			return true
+		}
+	}
+
+	return false
 }
 
 // startCleanupScheduler runs periodic cleanup like your PowerShell script

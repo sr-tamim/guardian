@@ -38,11 +38,11 @@ type BlockingConfig struct {
 
 // GenerateRuleName creates a firewall rule name from the template
 // Supports placeholders: {app}, {timestamp}, {ip}, {service}
-// Default template: "Guardian - {timestamp} - {ip}"
+// Default template: "Guardian - {ip} - {timestamp}"
 func (b *BlockingConfig) GenerateRuleName(ip, service string) string {
 	template := b.RuleNameTemplate
 	if template == "" {
-		template = "Guardian - {timestamp} - {ip}" // Default fallback
+		template = "Guardian - {ip} - {timestamp}" // Default fallback
 	}
 
 	timestamp := time.Now().Format("20060102150405") // yyyyMMddHHmmss format
@@ -115,7 +115,7 @@ func DefaultConfig() *Config {
 			},
 			AutoUnblock:      true,
 			CleanupInterval:  30 * time.Second,                // Fast cleanup for development
-			RuleNameTemplate: "Guardian - {timestamp} - {ip}", // Default template
+			RuleNameTemplate: "Guardian - {ip} - {timestamp}", // Default template
 		},
 		Logging: LoggingConfig{
 			Level:               "debug",
@@ -168,7 +168,7 @@ func ProductionConfig() *Config {
 			},
 			AutoUnblock:      true,
 			CleanupInterval:  5 * time.Minute,                 // Production cleanup every 5 minutes
-			RuleNameTemplate: "Guardian - {timestamp} - {ip}", // Default template
+			RuleNameTemplate: "Guardian - {ip} - {timestamp}", // Default template
 		},
 		Logging: LoggingConfig{
 			Level:               "info",
