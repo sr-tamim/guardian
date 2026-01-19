@@ -72,6 +72,7 @@ func (p *guardianProgram) run(ctx context.Context) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			logger.Error("Guardian service panic", "panic", recovered)
+			writeEventLog("error", "Guardian service panic")
 		}
 		close(p.done)
 	}()
@@ -79,6 +80,7 @@ func (p *guardianProgram) run(ctx context.Context) {
 	config, err := p.configLoader()
 	if err != nil {
 		logger.Error("Failed to load configuration", "error", err)
+		writeEventLog("error", "Guardian service failed to load configuration")
 		return
 	}
 
@@ -86,6 +88,7 @@ func (p *guardianProgram) run(ctx context.Context) {
 	provider, err := factory.CreateProvider(*p.devMode, config)
 	if err != nil {
 		logger.Error("Failed to create platform provider", "error", err)
+		writeEventLog("error", "Guardian service failed to create platform provider")
 		return
 	}
 
@@ -97,12 +100,14 @@ func (p *guardianProgram) run(ctx context.Context) {
 
 	if runtime.GOOS == "windows" {
 		logger.Info("Guardian service starting (Windows)")
+		writeEventLog("info", "Guardian service starting")
 	} else {
 		logger.Info("Guardian service starting")
 	}
 
 	if err := manager.RunMonitorInCurrentProcess(ctx); err != nil {
 		logger.Error("Guardian service stopped with error", "error", err)
+		writeEventLog("error", "Guardian service stopped with error")
 		return
 	}
 }

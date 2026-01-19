@@ -20,6 +20,18 @@ type Logger struct {
 	level  slog.Level
 }
 
+type syncWriter struct {
+	w *os.File
+}
+
+func (s *syncWriter) Write(p []byte) (int, error) {
+	n, err := s.w.Write(p)
+	if err == nil {
+		_ = s.w.Sync()
+	}
+	return n, err
+}
+
 // LogContext holds contextual information for each log entry
 type LogContext struct {
 	Function string // Function name
@@ -63,32 +75,51 @@ func NewLogger(config *models.LoggingConfig) (*Logger, error) {
 	// Set up output writers
 	var writers []io.Writer
 
+	// Add file output first (so stdout/stderr errors don't block file logging)
+	if config.EnableFile {
+		paths := utils.NewPlatformPaths()
+		defaultPath := paths.GetDefaultGuardianLogPath()
+		primaryPath := config.FilePath
+		if primaryPath == "" {
+			primaryPath = defaultPath
+		}
+
+		openLogFile := func(path string) (*os.File, error) {
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				return nil, err
+			}
+			file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			if err != nil {
+				return nil, err
+			}
+			_, _ = fmt.Fprintf(file, "[%s] Guardian logging initialized\n", time.Now().Format(time.RFC3339))
+			_ = file.Sync()
+			return file, nil
+		}
+
+		file, err := openLogFile(primaryPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to open log file (%s): %v\n", primaryPath, err)
+			if primaryPath != defaultPath {
+				file, err = openLogFile(defaultPath)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "failed to open fallback log file (%s): %v\n", defaultPath, err)
+				} else {
+					config.FilePath = defaultPath
+					writers = append(writers, &syncWriter{w: file})
+				}
+			}
+		} else {
+			config.FilePath = primaryPath
+			writers = append(writers, &syncWriter{w: file})
+		}
+	}
+
 	// Add stdout/stderr if configured
 	if config.Output == "stdout" {
 		writers = append(writers, os.Stdout)
 	} else if config.Output == "stderr" {
 		writers = append(writers, os.Stderr)
-	}
-
-	// Add file output if enabled
-	if config.EnableFile {
-		filePath := config.FilePath
-		if filePath == "" {
-			paths := utils.NewPlatformPaths()
-			filePath = paths.GetDefaultGuardianLogPath()
-		}
-
-		// Ensure directory exists
-		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create log directory (%s): %v\n", filePath, err)
-		} else {
-			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to open log file (%s): %v\n", filePath, err)
-			} else {
-				writers = append(writers, file)
-			}
-		}
 	}
 
 	// If no writers configured, default to stdout
