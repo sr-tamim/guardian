@@ -80,6 +80,8 @@ Note: Firewall rules created by Guardian include a description tag `GuardianTag=
 - `log_monitoring_events`: Start/stop events.
 - `log_cleanup_events`: Cleanup details.
 
+Note: In Windows Service mode, `stdout` may be unavailable. File logging is prioritized so logs still write to `file_path`.
+
 ### storage
 - `type`: `memory` or `sqlite` (sqlite planned).
 - `file_path`: Database path (used for sqlite).
