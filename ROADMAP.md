@@ -25,6 +25,10 @@
 - System tray integration (Windows)
 - Professional code organization and maintainability
 
+✅ **Windows Service Reliability (v0.0.3)**
+- Windows Service command support (install/start/stop/status)
+- Service-run mode for headless operation
+
 ✅ **Interactive TUI Dashboard Complete (v0.0.2)**
 - Interactive TUI dashboard with Bubble Tea framework
 - Real-time service management and monitoring
@@ -55,6 +59,11 @@
 - **Persistent Storage** - SQLite integration for attack/block records
 - **Integration Layer** - Wire all components together in main monitoring loop
 
+#### **Immediate Next: 4625 Config-Driven Detection**
+- **Config-driven Event ID 4625 filtering** - Use services config to control Windows Security log monitoring
+- **Flexible service selection** - Enable/disable Windows log sources via YAML
+- **Parity with PowerShell** - Ensure 4625 counts include all logon types when configured
+
 #### **Implementation Priority**
 1. **Storage persistence** - Save attack attempts and block records
 2. **Full end-to-end testing** - Real attack detection and blocking
@@ -71,6 +80,11 @@
 - **Service status integration** - Show service state in TUI/CLI
 - **Service logs** - Integration with system logging
 
+#### **Linux Reliability Plan**
+- **systemd unit + installer** - Provide unit file and installation helper
+- **Journal logging** - Ensure logs are available via `journalctl`
+- **Restart policy** - Configure `Restart=always` with backoff
+
 #### **Enhanced Process Management**
 - **Service lifecycle** - Install, start, stop, uninstall commands
 - **Process monitoring** - Health checks and automatic restart
@@ -80,6 +94,10 @@
 #### **Desktop Integration**
 - **Emergency controls** - Quick stop/unblock features via tray
 - **Desktop notifications** - Attack alerts and status updates
+
+#### **Future: SQL Server Detection**
+- **SQL Server failed login detection** - Add parser for SQL error log or Windows Application events
+- **Config-driven source** - Allow selecting SQL log source/path in YAML
 
 ---
 
