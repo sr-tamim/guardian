@@ -5,6 +5,7 @@ import (
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -58,12 +59,13 @@ func newRootCommand() *cobra.Command {
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Configuration file path")
 
 	// Add subcommands
-	rootCmd.AddCommand(commands.NewMonitorCmd(getConfig, &devMode))
+	rootCmd.AddCommand(commands.NewMonitorCmd(getConfig, &devMode, &configFile))
 	rootCmd.AddCommand(commands.NewStopCmd(getConfig, &devMode))
 	rootCmd.AddCommand(commands.NewStatusCmd(&devMode))
 	rootCmd.AddCommand(commands.NewVersionCmd())
 	rootCmd.AddCommand(commands.NewTUICmd(getConfig, &devMode))
 	rootCmd.AddCommand(commands.NewAutostartCmd(getConfig, &devMode))
+	rootCmd.AddCommand(commands.NewServiceCmd(getConfig, &devMode, &configFile))
 
 	return rootCmd
 }
@@ -129,9 +131,16 @@ func loadConfig() error {
 		fmt.Println("📝 Using default configuration...")
 	}
 
-	// Unmarshal into struct
+	// Unmarshal into struct (use yaml tags + handle time.Duration values)
 	config = &models.Config{}
-	if err := viper.Unmarshal(config); err != nil {
+	withTag := viper.DecoderConfigOption(func(dc *mapstructure.DecoderConfig) {
+		dc.TagName = "yaml"
+	})
+	if err := viper.Unmarshal(
+		config,
+		viper.DecodeHook(mapstructure.StringToTimeDurationHookFunc()),
+		withTag,
+	); err != nil {
 		return fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
@@ -145,6 +154,8 @@ func loadConfig() error {
 			"config_file", viper.ConfigFileUsed(),
 			"log_level", config.Logging.Level,
 			"log_format", config.Logging.Format,
+			"log_file_enabled", config.Logging.EnableFile,
+			"log_file_path", config.Logging.FilePath,
 		)
 	}
 

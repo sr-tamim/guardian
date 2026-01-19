@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/sr-tamim/guardian/internal/core"
+	"github.com/sr-tamim/guardian/pkg/logger"
 	"github.com/sr-tamim/guardian/pkg/models"
 )
 
@@ -20,15 +21,17 @@ type Manager struct {
 	config     *models.Config
 	provider   core.PlatformProvider
 	devMode    bool
+	configPath string
 }
 
 // NewManager creates a new daemon manager
-func NewManager(config *models.Config, provider core.PlatformProvider, devMode bool) *Manager {
+func NewManager(config *models.Config, provider core.PlatformProvider, devMode bool, configPath string) *Manager {
 	return &Manager{
 		pidManager: NewPIDManager(),
 		config:     config,
 		provider:   provider,
 		devMode:    devMode,
+		configPath: configPath,
 	}
 }
 
@@ -59,6 +62,9 @@ func (dm *Manager) StartDaemonWithOptions(withTray bool) error {
 	args := []string{"monitor", "--daemon-internal"}
 	if dm.devMode {
 		args = append(args, "--dev")
+	}
+	if dm.configPath != "" {
+		args = append(args, "--config", dm.configPath)
 	}
 	if withTray {
 		args = append(args, "--tray")
@@ -258,6 +264,26 @@ func (dm *Manager) RunMonitorWithOptions(ctx context.Context, withTray bool) err
 	monitorCtx, monitorCancel := context.WithCancel(ctx)
 	defer monitorCancel()
 
+	// Heartbeat logging for service reliability monitoring
+	startTime := time.Now()
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-monitorCtx.Done():
+				return
+			case <-ticker.C:
+				logger.Info("Guardian heartbeat",
+					"uptime", time.Since(startTime).Truncate(time.Second),
+					"platform", dm.provider.Name(),
+					"services", dm.enabledServiceCount(),
+				)
+			}
+		}
+	}()
+
 	// Start monitoring for enabled services
 	for _, service := range dm.config.Services {
 		if service.Enabled {
@@ -302,6 +328,16 @@ func (dm *Manager) RunMonitorWithOptions(ctx context.Context, withTray bool) err
 	fmt.Println("🛑 Guardian daemon monitoring stopped")
 
 	return nil
+}
+
+func (dm *Manager) enabledServiceCount() int {
+	count := 0
+	for _, service := range dm.config.Services {
+		if service.Enabled {
+			count++
+		}
+	}
+	return count
 }
 
 // getLogDir returns the appropriate log directory for the platform

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sr-tamim/guardian/pkg/models"
+	"github.com/sr-tamim/guardian/pkg/utils"
 )
 
 // Logger wraps slog.Logger with Guardian-specific functionality
@@ -70,18 +71,24 @@ func NewLogger(config *models.LoggingConfig) (*Logger, error) {
 	}
 
 	// Add file output if enabled
-	if config.EnableFile && config.FilePath != "" {
+	if config.EnableFile {
+		filePath := config.FilePath
+		if filePath == "" {
+			paths := utils.NewPlatformPaths()
+			filePath = paths.GetDefaultGuardianLogPath()
+		}
+
 		// Ensure directory exists
-		if err := os.MkdirAll(filepath.Dir(config.FilePath), 0755); err != nil {
-			return nil, fmt.Errorf("failed to create log directory: %w", err)
+		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create log directory (%s): %v\n", filePath, err)
+		} else {
+			file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to open log file (%s): %v\n", filePath, err)
+			} else {
+				writers = append(writers, file)
+			}
 		}
-
-		file, err := os.OpenFile(config.FilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open log file: %w", err)
-		}
-
-		writers = append(writers, file)
 	}
 
 	// If no writers configured, default to stdout

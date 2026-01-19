@@ -30,7 +30,7 @@ func NewStopCmd(configLoader func() (*models.Config, error), devMode *bool) *cob
 			}
 
 			// Create daemon manager
-			daemonManager := daemon.NewManager(config, provider, *devMode)
+			daemonManager := daemon.NewManager(config, provider, *devMode, "")
 
 			// Stop the daemon
 			return daemonManager.StopDaemon()

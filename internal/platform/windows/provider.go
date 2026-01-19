@@ -40,6 +40,8 @@ type WindowsProvider struct {
 	stopCleanup chan struct{}
 }
 
+const guardianRuleTag = "GuardianTag=Guardian"
+
 // NewWindowsProvider creates a new Windows platform provider
 func NewWindowsProvider(config *models.Config) *WindowsProvider {
 	return &WindowsProvider{
@@ -99,6 +101,11 @@ func (w *WindowsProvider) BlockIP(ip string, duration time.Duration, reason stri
 		return core.NewError(core.ErrIPAlreadyBlocked, fmt.Sprintf("IP %s is already blocked", ip), nil)
 	}
 
+	// Check firewall for existing Guardian rule (avoid duplicate rules after restarts)
+	if w.guardianRuleExists(ip) {
+		return core.NewError(core.ErrIPAlreadyBlocked, fmt.Sprintf("IP %s is already blocked (firewall rule exists)", ip), nil)
+	}
+
 	// Generate rule name using the configurable template (like your PS script)
 	ruleName := w.config.Blocking.GenerateRuleName(ip, "RDP")
 
@@ -109,7 +116,7 @@ func (w *WindowsProvider) BlockIP(ip string, duration time.Duration, reason stri
 		"dir=in",
 		"action=block",
 		fmt.Sprintf("remoteip=%s", ip),
-		"description=Guardian IPS - Blocked due to failed login attempts")
+		fmt.Sprintf("description=Guardian IPS - Blocked due to failed login attempts (%s)", guardianRuleTag))
 
 	if err := cmd.Run(); err != nil {
 		return core.NewError(core.ErrFirewallOperation,
@@ -514,6 +521,63 @@ func (w *WindowsProvider) isWhitelistedIP(ip string) bool {
 	}
 
 	return false
+}
+
+func (w *WindowsProvider) guardianRuleExists(ip string) bool {
+	cmd := exec.Command("netsh", "advfirewall", "firewall", "show", "rule", "name=all")
+	output, err := cmd.Output()
+	if err != nil {
+		logger.Warn("Failed to query firewall rules", "error", err)
+		return false
+	}
+
+	lines := strings.Split(string(output), "\n")
+	currentHasTag := false
+	currentMatchesIP := false
+
+	checkRule := func() bool {
+		return currentHasTag && currentMatchesIP
+	}
+
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			if checkRule() {
+				return true
+			}
+			currentHasTag = false
+			currentMatchesIP = false
+			continue
+		}
+
+		lower := strings.ToLower(line)
+		if strings.HasPrefix(lower, "rule name") {
+			if checkRule() {
+				return true
+			}
+			currentHasTag = false
+			currentMatchesIP = false
+			continue
+		}
+
+		if strings.HasPrefix(lower, "description") && strings.Contains(line, guardianRuleTag) {
+			currentHasTag = true
+		}
+
+		if strings.HasPrefix(lower, "remoteip") {
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) == 2 {
+				for _, candidate := range strings.Split(parts[1], ",") {
+					if strings.TrimSpace(candidate) == ip {
+						currentMatchesIP = true
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return checkRule()
 }
 
 // startCleanupScheduler runs periodic cleanup like your PowerShell script

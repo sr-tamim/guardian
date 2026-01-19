@@ -16,7 +16,7 @@ import (
 )
 
 // NewMonitorCmd creates the monitor command
-func NewMonitorCmd(configLoader func() (*models.Config, error), devMode *bool) *cobra.Command {
+func NewMonitorCmd(configLoader func() (*models.Config, error), devMode *bool, configPath *string) *cobra.Command {
 	var daemonMode bool
 	var daemonInternal bool
 	var trayMode bool
@@ -40,7 +40,11 @@ func NewMonitorCmd(configLoader func() (*models.Config, error), devMode *bool) *
 			}
 
 			// Create daemon manager
-			daemonManager := daemon.NewManager(config, provider, *devMode)
+			path := ""
+			if configPath != nil {
+				path = *configPath
+			}
+			daemonManager := daemon.NewManager(config, provider, *devMode, path)
 
 			// Handle daemon-internal mode (when spawned by daemon)
 			if daemonInternal {
